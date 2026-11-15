@@ -4,7 +4,7 @@ import type { EngineInterface, Register, ThemeSetArgs } from 'claude-code'
 import type { Account, Activity, ActivityKind, Memory, Mood, SessionInfo } from '../types'
 import { PALETTES, animForTool, animSvg, clawdSvg } from './sprites'
 import type { AnimName } from './sprites'
-import { customTheme, pessoal, usp } from './themes'
+import { customTheme } from './themes'
 import type { ContaTema } from './themes'
 
 const PLUGIN = 'clawd-companheiro'
@@ -25,14 +25,8 @@ const HEARTBEAT_MS = 20_000
 // e-mails ela é e as cores do tema dela.
 export type Conta = { chave: string; nome: string; emails: string; tema?: ContaTema }
 
-// Os temas feitos à mão; valem enquanto a conta estiver com o tema "padrão".
-const BUILTIN: Record<string, typeof usp.theme> = { usp: usp.theme, pessoal: pessoal.theme }
-
-// Sem config, as duas contas de sempre: USP pelo domínio, o resto é a Pessoal.
-const CONTAS_PADRAO: readonly Conta[] = [
-  { chave: 'usp', nome: 'USP', emails: 'usp.br', tema: { padrao: true, principal: '#1094ab' } },
-  { chave: 'pessoal', nome: 'Pessoal', emails: '*', tema: { padrao: true, principal: '#8b30e6' } },
-]
+// Sem config (a Central ainda não foi aberta), toda sessão é de uma conta só, sem tema.
+const CONTAS_PADRAO: readonly Conta[] = [{ chave: 'claude', nome: 'Claude', emails: '*', tema: { ativo: false } }]
 const CONFIG_EVERY_TICKS = 2
 
 const STATE_TEXT: Record<ActivityKind, string> = {
@@ -96,7 +90,7 @@ export function detailFor(tool: string, input: Record<string, unknown>): string 
 
 const PETS = ['Hehe!', 'Obrigado!', 'Que carinho bom', 'De novo!', '♥', 'Tô feliz!']
 
-// A conta de um e-mail. Cada conta lista domínios (usp.br vale para ime.usp.br também) ou
+// A conta de um e-mail. Cada conta lista domínios (empresa.com vale para ti.empresa.com também) ou
 // e-mails inteiros; a que tiver "*" fica com todos os outros.
 export function accountOf(email: string | undefined, contas: readonly Conta[] = CONTAS_PADRAO): Account {
   if (email === undefined || email.trim() === '') return 'outra'
@@ -380,8 +374,7 @@ async function applyTheme($: E) {
   const key = JSON.stringify(tema)
   if (key === st.themeKey) return
   st.themeKey = key
-  const builtin = tema.padrao !== false ? BUILTIN[st.account] : undefined
-  const colors = tema.ativo === false ? undefined : (builtin ?? customTheme(conta.nome, tema))
+  const colors = tema.ativo === true ? customTheme(conta.nome, tema) : undefined
   const look: ThemeSetArgs = { ...(colors !== undefined ? { colors } : {}), backdrop: { scene: SCENE } }
   await $.theme.set(look)
 }

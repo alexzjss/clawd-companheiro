@@ -7,3 +7,4 @@ bin/
 .claude-plugin/types/
 tsconfig.json
 node_modules/
+dist/

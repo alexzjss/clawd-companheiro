@@ -5,8 +5,6 @@ import { makeColors } from './make-colors.js'
 // As cores de um tema como a Central dos Clawds grava em ~/.claude/clawd/config.json.
 export type ContaTema = {
   ativo?: boolean
-  /** true: o tema feito à mão daquela conta (USP, Pessoal), se houver. */
-  padrao?: boolean
   principal?: string
   fundo?: string
   aviso?: string
@@ -92,66 +90,3 @@ export function customTheme(label: string, t: ContaTema): ThemeColors | undefine
     return undefined
   }
 }
-
-// USP: azul primário #1094ab, azul secundário #64c4d2 e amarelo #fcb421 (manual de
-// identidade visual da USP). Cinzas tingidos de azul-petróleo; o amarelo vira o aviso.
-export const usp = makeColors({
-  label: 'USP',
-  roles: { accent: '#1094ab', danger: '#c23b32', success: '#2f8a5b', warning: '#fcb421', pro: '#3f6db3' },
-  light: {
-    gray: {
-      anchors: {
-        'surface-0': '#e6f2f4',
-        'surface-1': '#eef7f8',
-        'surface-2': '#f7fbfc',
-        'text-primary': '#0b2a31',
-        'text-secondary': '#2c4f58',
-        'text-muted': '#456a74',
-      },
-    },
-  },
-  dark: {
-    gray: {
-      anchors: {
-        'surface-0': '#0a1e24',
-        'surface-1': '#0f272e',
-        'surface-2': '#143139',
-        'surface-3': '#173740',
-        'text-primary': '#e5f3f6',
-        'text-secondary': '#b5d2d9',
-        'text-muted': '#8db0b9',
-      },
-    },
-  },
-})
-
-// Pessoal: violeta holográfico, par do ícone da barra de tarefas.
-export const pessoal = makeColors({
-  label: 'Pessoal',
-  roles: { accent: '#8b30e6', danger: '#c23a4b', success: '#3d8b5f', warning: '#c9801a', pro: '#d03fe0' },
-  light: {
-    gray: {
-      anchors: {
-        'surface-0': '#efe7f8',
-        'surface-1': '#f5eefb',
-        'surface-2': '#fbf8fe',
-        'text-primary': '#27183a',
-        'text-secondary': '#4f3d68',
-        'text-muted': '#665480',
-      },
-    },
-  },
-  dark: {
-    gray: {
-      anchors: {
-        'surface-0': '#150e1f',
-        'surface-1': '#1c1428',
-        'surface-2': '#251b34',
-        'surface-3': '#2a1f3b',
-        'text-primary': '#f0e8fb',
-        'text-secondary': '#cbbde0',
-        'text-muted': '#a496bd',
-      },
-    },
-  },
-})

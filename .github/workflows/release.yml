@@ -1,0 +1,25 @@
+# Uma tag vX.Y.Z vira uma release com o instalador ClawdSetup.exe.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  instalador:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compilar os programas e o instalador
+        shell: powershell
+        run: ./desktop/build.ps1 -Out dist -Setup
+
+      - name: Publicar a release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create $env:GITHUB_REF_NAME dist/ClawdSetup.exe --title "Clawd Companheiro $env:GITHUB_REF_NAME" --generate-notes

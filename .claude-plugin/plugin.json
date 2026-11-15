@@ -1,6 +1,6 @@
 {
   "name": "clawd-companheiro",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Um Clawd por sessão no Claude Desktop: passeia no fundo, anima o indicador de trabalho conforme a ferramenta, lista as sessões num painel e lembra de você entre sessões. Aplica o tema de cada conta.",
   "author": { "name": "alexzjss" },
   "repository": "https://github.com/alexzjss/clawd-companheiro",

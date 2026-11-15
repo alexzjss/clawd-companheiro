@@ -21,6 +21,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using IOPath = System.IO.Path;
 
@@ -243,13 +244,6 @@ namespace ClawdDesktop
             new[] { "Grafite", "#6b7280", "#7a7f8a", "#c9801a", "#3d8b5f", "#c23b32", "#3f6db3" },
         };
 
-        // Os temas feitos à mão dentro do mod, para o botão "Original" de cada conta.
-        static readonly Dictionary<string, string[]> Originals = new Dictionary<string, string[]>
-        {
-            { "usp", new[] { "Original USP", "#1094ab", "#1094ab", "#fcb421", "#2f8a5b", "#c23b32", "#3f6db3" } },
-            { "pessoal", new[] { "Original Pessoal", "#8b30e6", "#8b30e6", "#c9801a", "#3d8b5f", "#c23a4b", "#d03fe0" } },
-        };
-
         Cfg cfg;
         List<Skin> skins;
         AccountCfg sel;
@@ -260,6 +254,7 @@ namespace ClawdDesktop
         DateTime stamp;
         Popup picker;
         bool busy;
+        readonly bool photo;   // fotos do README: contas de mentira, nada é gravado
 
         readonly StackPanel accountList = new StackPanel();
         readonly StackPanel globalBox = new StackPanel();
@@ -268,7 +263,7 @@ namespace ClawdDesktop
         readonly List<ClawdView> blinkers = new List<ClawdView>();
         readonly string appDir = IOPath.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
 
-        public Central()
+        public Central(Cfg sample)
         {
             Title = "Central dos Clawds";
             Width = 1040;
@@ -286,15 +281,22 @@ namespace ClawdDesktop
                 try { DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 20, ref on, 4); } catch { }
             };
 
-            Skin.WriteGuide(Cfg.SkinsDir);
-            skins = Skin.LoadAll(Cfg.SkinsDir);
-            cfg = Cfg.Load();
-            profileSig = ProfileSig();
+            photo = sample != null;
+            if (!photo) Skin.WriteGuide(Cfg.SkinsDir);
+            skins = photo ? Skin.Builtin() : Skin.LoadAll(Cfg.SkinsDir);
+            cfg = sample ?? Cfg.Load();
+            profileSig = photo ? "" : ProfileSig();
             sel = cfg.Accounts.FirstOrDefault();
             // Grava já: é este arquivo que liga o mod e os Clawds às escolhas daqui.
-            SaveNow();
+            if (!photo) SaveNow();
+            else
+            {
+                foreach (var a in cfg.Accounts) running[a.Profile] = 1;
+                active[cfg.Accounts[0].Key] = 2;
+                overlayOn = true;
+            }
 
-            var root = new Grid();
+            var root = new Grid { Background = Ui.Bg };
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(270) });
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
@@ -324,13 +326,13 @@ namespace ClawdDesktop
 
             var poll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(2500) };
             poll.Tick += delegate { RefreshStatus(); };
-            poll.Start();
+            if (!photo) poll.Start();
             var blink = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(3200) };
             blink.Tick += delegate { BlinkAll(); };
             blink.Start();
 
             RenderAll();
-            RefreshStatus();
+            if (!photo) RefreshStatus();
             Closing += delegate { if (saveTimer.IsEnabled) SaveNow(); };
         }
 
@@ -499,7 +501,7 @@ namespace ClawdDesktop
             }
 
             var add = new WrapPanel { Margin = new Thickness(2, 6, 0, 0) };
-            if (Profiles.HasSwitcher)
+            if (Profiles.HasSwitcher || photo)
             {
                 var plus = Ui.Button("+ Nova conta", null, AddAccount);
                 plus.Margin = new Thickness(0, 0, 8, 6);
@@ -592,7 +594,7 @@ namespace ClawdDesktop
             who.Children.Add(warn);
             check();
             sp.Children.Add(Ui.Section("E-mails desta conta",
-                "É por aqui que cada sessão descobre de qual conta é. Escreva domínios (usp.br) ou e-mails inteiros, separados por vírgula. Um * pega todos os outros.", who));
+                "É por aqui que cada sessão descobre de qual conta é. Escreva domínios (empresa.com) ou e-mails inteiros, separados por vírgula. Um * pega todos os outros.", who));
 
             sp.Children.Add(Ui.Section("Tema do Claude", "As cores do app nesta conta. Sessões abertas trocam em alguns segundos.", BuildTheme(a)));
             sp.Children.Add(Ui.Section("Clawd na área de trabalho", "O mascote desta conta em cima da barra de tarefas.", BuildClawd(a)));
@@ -609,10 +611,9 @@ namespace ClawdDesktop
 
         // ---- tema
 
-        void ApplyPreset(AccountCfg a, string[] p, bool original)
+        void ApplyPreset(AccountCfg a, string[] p)
         {
             a.Accent = p[1]; a.Surface = p[2]; a.Warning = p[3]; a.Success = p[4]; a.Danger = p[5]; a.Pro = p[6];
-            a.ThemeDefault = original;
             a.ThemeOn = true;
             Changed(true);
         }
@@ -622,13 +623,12 @@ namespace ClawdDesktop
             return a.Accent == p[1] && a.Surface == p[2] && a.Warning == p[3] && a.Success == p[4] && a.Danger == p[5] && a.Pro == p[6];
         }
 
-        UIElement PresetChip(AccountCfg a, string[] p, bool original)
+        UIElement PresetChip(AccountCfg a, string[] p)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal };
             row.Children.Add(new Border { Width = 12, Height = 12, CornerRadius = new CornerRadius(6), Background = Pal.B(p[1], 1), Margin = new Thickness(0, 1, 6, 0), VerticalAlignment = VerticalAlignment.Center });
             row.Children.Add(Ui.T(p[0], 12.5, Ui.Text, false));
-            bool on = a.ThemeOn && Matches(a, p) && a.ThemeDefault == original;
-            return Ui.Chip(row, on, a.Accent, delegate { ApplyPreset(a, p, original); });
+            return Ui.Chip(row, a.ThemeOn && Matches(a, p), a.Accent, delegate { ApplyPreset(a, p); });
         }
 
         UIElement BuildTheme(AccountCfg a)
@@ -642,18 +642,16 @@ namespace ClawdDesktop
             }
 
             var presets = new WrapPanel { Margin = new Thickness(0, 6, 0, 8) };
-            string[] orig;
-            if (Originals.TryGetValue(a.Key, out orig)) presets.Children.Add(PresetChip(a, orig, true));
-            foreach (var p in Presets) presets.Children.Add(PresetChip(a, p, false));
+            foreach (var p in Presets) presets.Children.Add(PresetChip(a, p));
             sp.Children.Add(presets);
 
             var colors = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
-            colors.Children.Add(ColorCell("Principal", "Botões, links e destaques.", a.Accent, delegate(string v) { a.Accent = v; a.ThemeDefault = false; Changed(true); }));
-            colors.Children.Add(ColorCell("Fundo", "O tom dos fundos e dos textos.", a.Surface, delegate(string v) { a.Surface = v; a.ThemeDefault = false; Changed(true); }));
-            colors.Children.Add(ColorCell("Sucesso", null, a.Success, delegate(string v) { a.Success = v; a.ThemeDefault = false; Changed(true); }));
-            colors.Children.Add(ColorCell("Aviso", null, a.Warning, delegate(string v) { a.Warning = v; a.ThemeDefault = false; Changed(true); }));
-            colors.Children.Add(ColorCell("Erro", null, a.Danger, delegate(string v) { a.Danger = v; a.ThemeDefault = false; Changed(true); }));
-            colors.Children.Add(ColorCell("Pro", "Selos e recursos extras.", a.Pro, delegate(string v) { a.Pro = v; a.ThemeDefault = false; Changed(true); }));
+            colors.Children.Add(ColorCell("Principal", "Botões, links e destaques.", a.Accent, delegate(string v) { a.Accent = v; Changed(true); }));
+            colors.Children.Add(ColorCell("Fundo", "O tom dos fundos e dos textos.", a.Surface, delegate(string v) { a.Surface = v; Changed(true); }));
+            colors.Children.Add(ColorCell("Sucesso", null, a.Success, delegate(string v) { a.Success = v; Changed(true); }));
+            colors.Children.Add(ColorCell("Aviso", null, a.Warning, delegate(string v) { a.Warning = v; Changed(true); }));
+            colors.Children.Add(ColorCell("Erro", null, a.Danger, delegate(string v) { a.Danger = v; Changed(true); }));
+            colors.Children.Add(ColorCell("Pro", "Selos e recursos extras.", a.Pro, delegate(string v) { a.Pro = v; Changed(true); }));
             sp.Children.Add(colors);
 
             var previews = new WrapPanel();
@@ -667,12 +665,6 @@ namespace ClawdDesktop
                 previews.Children.Add(one);
             }
             sp.Children.Add(previews);
-            if (a.ThemeDefault && Originals.ContainsKey(a.Key))
-            {
-                var n = Ui.T("Este é o tema original da conta, ajustado à mão; a prévia é aproximada.", 11.5, Ui.Dim, false);
-                n.Margin = new Thickness(0, 10, 0, 0);
-                sp.Children.Add(n);
-            }
             return sp;
         }
 
@@ -845,6 +837,32 @@ namespace ClawdDesktop
             pop.IsOpen = true;
         }
 
+        // ------------------------------------------------------------- fotos --
+
+        void Shoot(string file)
+        {
+            var root = (FrameworkElement)Content;
+            root.UpdateLayout();
+            Dispatcher.Invoke(new Action(delegate { }), DispatcherPriority.ContextIdle);
+            var bmp = new RenderTargetBitmap((int)(root.ActualWidth * 1.5), (int)(root.ActualHeight * 1.5), 144, 144, PixelFormats.Pbgra32);
+            bmp.Render(root);
+            var enc = new PngBitmapEncoder();
+            enc.Frames.Add(BitmapFrame.Create(bmp));
+            using (var fs = File.Create(file)) enc.Save(fs);
+        }
+
+        // As duas telas do README: o tema de uma conta e o Clawd da outra.
+        public void Photos(string dir)
+        {
+            Directory.CreateDirectory(dir);
+            Shoot(IOPath.Combine(dir, "central-tema.png"));
+            sel = cfg.Accounts[cfg.Accounts.Count - 1];
+            RenderAll();
+            detail.UpdateLayout();
+            detail.ScrollToEnd();
+            Shoot(IOPath.Combine(dir, "central-clawd.png"));
+        }
+
         // ------------------------------------------------------------- ações --
 
         void Try(Action f)
@@ -903,8 +921,24 @@ namespace ClawdDesktop
     static class CentralProgram
     {
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
+            int fi = Array.FindIndex(args, x => x.Trim('-', '/').Equals("fotos", StringComparison.OrdinalIgnoreCase));
+            if (fi >= 0)
+            {
+                // desenha as telas do README com contas de mentira, fora da tela
+                string dir = fi + 1 < args.Length ? args[fi + 1] : "docs";
+                var shots = new Application();
+                var w = new Central(Cfg.Sample());
+                w.WindowStartupLocation = WindowStartupLocation.Manual;
+                w.Left = -4000;
+                w.Top = 0;
+                w.ShowInTaskbar = false;
+                w.ShowActivated = false;
+                w.ContentRendered += delegate { w.Photos(dir); shots.Shutdown(); };
+                shots.Run(w);
+                return;
+            }
             bool created;
             using (var mutex = new Mutex(true, "Local\\ClawdCentral", out created))
             {
@@ -915,7 +949,7 @@ namespace ClawdDesktop
                     try { File.AppendAllText(IOPath.Combine(Cfg.Dir, "central.log"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss ") + e.Exception + Environment.NewLine); } catch { }
                     e.Handled = true;
                 };
-                app.Run(new Central());
+                app.Run(new Central(null));
             }
         }
     }

@@ -1,4 +1,4 @@
-// Os Clawds da área de trabalho do Windows, em pixel art: um por conta (USP e Pessoal), nas
+﻿// Os Clawds da área de trabalho do Windows, em pixel art: um por conta do Claude, nas
 // cores de cada uma, numa faixa limitada no canto direito, bem acima da barra de tarefas.
 //
 // Lê o que as sessões do mod clawd-companheiro gravam em ~/.claude/clawd:
@@ -31,6 +31,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
@@ -479,8 +480,9 @@ namespace ClawdDesktop
         readonly List<Account> accounts = new List<Account>();
         readonly List<Particle> parts = new List<Particle>();
         readonly Stopwatch sw = Stopwatch.StartNew();
-        readonly Random rng = new Random();
-        readonly bool demo, festa;
+        Random rng = new Random();
+        bool demo, festa;
+        readonly bool photo;   // fotos do README: tempo e contas de mentira, sem janela
         readonly string shared, sessionsDir;
         string corner = "direito";
         Cfg cfg;
@@ -508,10 +510,11 @@ namespace ClawdDesktop
         int petCount;
         double lastPet;
 
-        public double T { get { return sw.Elapsed.TotalSeconds; } }
+        public double T { get { return fakeT >= 0 ? fakeT : sw.Elapsed.TotalSeconds; } }
 
-        public Stage(bool demo, bool festa)
+        public Stage(bool demo, bool festa, bool photo)
         {
+            this.photo = photo;
             this.demo = demo;
             this.festa = festa;
             if (festa) nextEvent = 4;
@@ -543,6 +546,7 @@ namespace ClawdDesktop
             view.MouseLeftButtonUp += OnUp;
             view.MouseRightButtonUp += OnRight;
 
+            if (photo) return;
             new Thread(WatchProcesses) { IsBackground = true, Name = "claude-watch" }.Start();
 
             var frame = new DispatcherTimer(DispatcherPriority.Render);
@@ -560,10 +564,12 @@ namespace ClawdDesktop
         // Quem já está na tela continua onde está; só troca de roupa.
         void LoadConfig()
         {
+            cfg = photo ? Cfg.Sample() : Cfg.Load();
+            // primeira vez: grava a config, que é por onde o mod sabe das contas
+            if (cfg.IsNew && !photo) { try { cfg.Save(); } catch { } }
             cfgStamp = Cfg.Stamp();
-            cfg = Cfg.Load();
             corner = cfg.Corner;
-            var skins = Skin.LoadAll(Cfg.SkinsDir);
+            var skins = photo ? Skin.Builtin() : Skin.LoadAll(Cfg.SkinsDir);
             var next = new List<Account>();
             foreach (var ac in cfg.Accounts)
             {
@@ -834,7 +840,7 @@ namespace ClawdDesktop
             }
         }
 
-        // Faixa de cada conta: a USP do lado de fora do canto, a Pessoal mais para dentro.
+        // Faixa de cada conta: a primeira do lado do canto, as outras mais para dentro.
         void Homes()
         {
             var vis = accounts.Where(a => a.Visible).ToList();
@@ -858,7 +864,7 @@ namespace ClawdDesktop
 
         void Frame()
         {
-            if (!IsVisible) return;
+            if (!IsVisible && !photo) return;
             double t = T;
             double dt = Math.Min(0.1, t - lastT);
             lastT = t;
@@ -3157,12 +3163,26 @@ namespace ClawdDesktop
             if (accounts.Count == 0) return;
             int k = (int)(t / 3.5);
             string k0 = accounts[0].Key, k1 = accounts[accounts.Count > 1 ? 1 : 0].Key;
-            // --eventos: todo mundo livre, para os encontros acontecerem um atrás do outro
-            string[] idle = { "ocioso", "", "" };
-            by[k0].Add(DemoS("u1", k0, "Refatorar o parser do JFLP", festa ? idle : Cases[k % Cases.Length], now, 3, "claude-fable-5-2", 40));
-            by[k0].Add(DemoS("u2", k0, "Revisar artigo", festa ? idle : Cases[(k + 11) % Cases.Length], now, 2, "claude-opus-5-5", 90));
-            by[k1].Add(DemoS("p1", k1, "Site pessoal", festa ? idle : Cases[(k + 21) % Cases.Length], now, 3, "claude-sonnet-5-5", 30));
-            if (!festa && (int)(t / 30) % 2 == 0) by[k1].Add(DemoS("p2", k1, "acha-promocoes", Cases[(k + 32) % Cases.Length], now, 1, "claude-haiku-5-5", 12));
+            if (shot != null)
+            {
+                // fotos do README: as sessões da cena
+                foreach (var s in shot)
+                {
+                    s.UpdatedAt = now;
+                    s.TurnStartedAt = now - 25000;
+                    if (s.EndedAt > 0) s.EndedAt = now;
+                    by[s.Account].Add(s);
+                }
+            }
+            else
+            {
+                // --eventos: todo mundo livre, para os encontros acontecerem um atrás do outro
+                string[] idle = { "ocioso", "", "" };
+                by[k0].Add(DemoS("u1", k0, "Corrigir o login", festa ? idle : Cases[k % Cases.Length], now, 3, "claude-fable-5-2", 40));
+                by[k0].Add(DemoS("u2", k0, "Revisar o relatório", festa ? idle : Cases[(k + 11) % Cases.Length], now, 2, "claude-opus-5-5", 90));
+                by[k1].Add(DemoS("p1", k1, "Site novo", festa ? idle : Cases[(k + 21) % Cases.Length], now, 3, "claude-sonnet-5-5", 30));
+                if (!festa && (int)(t / 30) % 2 == 0) by[k1].Add(DemoS("p2", k1, "Lista de compras", Cases[(k + 32) % Cases.Length], now, 1, "claude-haiku-5-5", 12));
+            }
             foreach (var a in accounts)
             {
                 var u = new Usage();
@@ -3176,6 +3196,117 @@ namespace ClawdDesktop
                 m["streak"] = a == accounts[0] ? 4 : 0;
                 a.Memory = m;
             }
+        }
+
+        // ---------------------------------------------------- fotos do README --
+
+        List<SessionView> shot;
+        double fakeT = -1;
+        int frames;
+
+        static SessionView Fake(string acc, string id, int age, string state, string tool, string detail, string model, string label, int agents)
+        {
+            var s = new SessionView();
+            s.Id = id; s.Account = acc; s.Label = label; s.State = state; s.Tool = tool; s.Detail = detail; s.Model = model;
+            s.StartedAt = Data.NowMs() - age * 3600000.0;
+            s.Turns = age * 6; s.Cost = age * 0.45; s.Ctx = 35; s.Agents = agents;
+            if (state == "encerrada") s.EndedAt = 1;
+            return s;
+        }
+
+        void Scene(params SessionView[] sessions)
+        {
+            shot = sessions.ToList();
+            ReadData(fakeT);
+        }
+
+        // Anda o relógio de mentira, quadro a quadro.
+        void Run(double secs)
+        {
+            for (double end = fakeT + secs; fakeT < end; fakeT += 1.0 / 30)
+            {
+                if (frames++ % 45 == 0) ReadData(fakeT);
+                Frame();
+            }
+        }
+
+        bool Until(Func<bool> ok, double max)
+        {
+            for (double end = fakeT + max; fakeT < end && !ok();) Run(0.1);
+            return ok();
+        }
+
+        // A faixa dos Clawds sobre um fundo e uma barra de tarefas desenhados.
+        void Snap(string file, Account withPanel)
+        {
+            const double S = 2, Sky = 150, Bar = 34;
+            double extra = withPanel != null ? 120 : 0, w = W, h = extra + Sky + Bar;
+            var dv = new DrawingVisual();
+            RenderOptions.SetEdgeMode(dv, EdgeMode.Aliased);
+            using (var dc = dv.RenderOpen())
+            {
+                dc.DrawRectangle(new LinearGradientBrush(Pal.C("#1c2a4e"), Pal.C("#2c6a82"), 90), null, new Rect(0, 0, w, h));
+                dc.DrawRectangle(Pal.B("#14151b", 1), null, new Rect(0, h - Bar, w, Bar));
+                for (int i = 0; i < 5; i++)
+                    dc.DrawRectangle(Pal.B("#ffffff", i == 0 ? 0.55 : 0.2), null, new Rect(w / 2 - 72 + i * 30, h - Bar + 9, 16, 16));
+                dc.PushTransform(new TranslateTransform(0, h - Bar - H));
+                Render(dc);
+                if (withPanel != null && withPanel.Main != null)
+                {
+                    panel.Build(withPanel, withPanel.Main.SessionId, Data.NowMs());
+                    ImageSource img = panel.Snapshot(S);
+                    double pw = panel.Width, ph = img.Height;
+                    dc.DrawImage(img, new Rect(Math.Round(Clamp(withPanel.Main.X - pw / 2, 6, w - pw - 6)), Math.Round(withPanel.Main.TopY - 8 - ph), pw, ph));
+                }
+                dc.Pop();
+            }
+            var bmp = new RenderTargetBitmap((int)(w * S), (int)(h * S), 96 * S, 96 * S, PixelFormats.Pbgra32);
+            bmp.Render(dv);
+            var enc = new PngBitmapEncoder();
+            enc.Frames.Add(BitmapFrame.Create(bmp));
+            using (var fs = File.Create(file)) enc.Save(fs);
+        }
+
+        // As cenas do README, com duas contas de mentira: cada uma num contexto.
+        public void Photos(string dir)
+        {
+            Directory.CreateDirectory(dir);
+            rng = new Random(11);
+            fakeT = 0;
+            string a = accounts[0].Key, b = accounts[1].Key;
+            Func<string, string> at = n => System.IO.Path.Combine(dir, "clawds-" + n + ".png");
+
+            Scene(Fake(a, "a1", 3, "ocioso", "", "", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "ocioso", "", "", "claude-sonnet-5-5", "Site novo", 0));
+            Run(3.4);
+            Scene(Fake(a, "a1", 3, "trabalhando", "Bash", "git", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "trabalhando", "Edit", "codigo", "claude-sonnet-5-5", "Site novo", 0));
+            Run(1.3);
+            Snap(at("trabalhando"), null);
+            Scene(Fake(a, "a1", 3, "trabalhando", "Bash", "teste", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "trabalhando", "WebSearch", "", "claude-sonnet-5-5", "Site novo", 0));
+            Run(2.2);
+            Snap(at("testes-web"), null);
+            Scene(Fake(a, "a1", 3, "aguardando", "AskUserQuestion", "", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "pensando", "", "", "claude-sonnet-5-5", "Site novo", 0));
+            Run(1.2);
+            Snap(at("esperando"), null);
+            Scene(Fake(a, "a1", 3, "feito", "", "", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "erro", "", "", "claude-sonnet-5-5", "Site novo", 0));
+            Run(0.75);
+            Snap(at("feito-erro"), null);
+            Scene(Fake(a, "a1", 3, "trabalhando", "Agent", "", "claude-fable-5-2", "Corrigir o login", 2), Fake(a, "a2", 1, "trabalhando", "Read", "doc", "claude-haiku-5-5", "Revisar o relatório", 0),
+                  Fake(b, "b1", 2, "trabalhando", "Bash", "compilar", "claude-sonnet-5-5", "Site novo", 0), Fake(b, "b2", 1, "pensando", "", "", "claude-haiku-5-5", "Lista de compras", 0));
+            Run(3.4);
+            Snap(at("filhotes"), null);
+            Snap(at("painel"), accounts[0]);
+            Scene(Fake(b, "b1", 2, "encerrada", "", "", "", "Site novo", 0));
+            Run(6);
+            Snap(at("descansando"), null);
+            Scene(Fake(a, "a1", 3, "ocioso", "", "", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "ocioso", "", "", "claude-sonnet-5-5", "Site novo", 0));
+            Run(4);
+            festa = true;
+            festaIdx = Array.IndexOf(FestaKinds, "ball");
+            nextEvent = fakeT;
+            if (Until(() => scene != null && scene.Kind == "ball" && scene.Phase == 1 && scene.Count >= 2, 30)) { Run(0.45); Snap(at("bola"), null); }
+            festaIdx = Array.IndexOf(FestaKinds, "ride");
+            Until(() => scene == null, 30);
+            if (Until(() => scene != null && scene.Kind == "ride" && scene.Phase == 2, 30)) { Run(1.6); Snap(at("cavalinho"), null); }
         }
 
         static SessionView DemoS(string id, string acc, string label, string[] st, double now, int age, string model, double ctx)
@@ -3238,6 +3369,17 @@ namespace ClawdDesktop
             if (!IsVisible) Show();
             Top = anchorBottom - ActualHeight;
             Native.KeepOnTop(this);
+        }
+
+        // O painel num bitmap, para as fotos do README.
+        public RenderTargetBitmap Snapshot(double scale)
+        {
+            card.Measure(new Size(Width, double.PositiveInfinity));
+            card.Arrange(new Rect(0, 0, Width, card.DesiredSize.Height));
+            card.UpdateLayout();
+            var bmp = new RenderTargetBitmap((int)(Width * scale), (int)Math.Ceiling(card.DesiredSize.Height * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
+            bmp.Render(card);
+            return bmp;
         }
 
         public void Close2()
@@ -3401,6 +3543,14 @@ namespace ClawdDesktop
             logPath = System.IO.Path.Combine(shared, "desktop.log");
             bool festa = args.Any(a => a.Trim('-', '/').Equals("eventos", StringComparison.OrdinalIgnoreCase));
             bool demo = festa || args.Any(a => a.Trim('-', '/').Equals("demo", StringComparison.OrdinalIgnoreCase));
+            int fi = Array.FindIndex(args, a => a.Trim('-', '/').Equals("fotos", StringComparison.OrdinalIgnoreCase));
+            if (fi >= 0)
+            {
+                // desenha as cenas do README em arquivos, sem abrir nada na tela
+                new Application();
+                new Stage(true, false, true).Photos(fi + 1 < args.Length ? args[fi + 1] : "docs");
+                return;
+            }
             bool created;
             using (var mutex = new Mutex(true, demo ? "Local\\ClawdDesktopDemo" : "Local\\ClawdDesktop", out created))
             {
@@ -3409,7 +3559,7 @@ namespace ClawdDesktop
                 app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 app.DispatcherUnhandledException += (s, e) => { Log("erro: " + e.Exception); e.Handled = true; };
                 Log(demo ? "Clawds acordaram (demo)" : "Clawds acordaram");
-                new Stage(demo, festa);
+                new Stage(demo, festa, false);
                 app.Run();
                 Log("Clawds foram dormir");
             }

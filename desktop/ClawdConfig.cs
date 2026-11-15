@@ -21,8 +21,8 @@ using System.Windows.Media;
 
 [assembly: System.Reflection.AssemblyTitle("Clawd Companheiro")]
 [assembly: System.Reflection.AssemblyProduct("Clawd Companheiro")]
-[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.1.0.0")]
 
 namespace ClawdDesktop
 {
@@ -434,7 +434,7 @@ namespace ClawdDesktop
                     {
                         string cl = (o["CommandLine"] as string) ?? "", exe = (o["ExecutablePath"] as string) ?? "";
                         // Só a janela principal do app: os filhos têm --type= e o Claude Code também se chama claude.exe.
-                        if (cl.Length == 0 || cl.Contains("--type=") || exe.IndexOf("\\WindowsApps\\Claude_", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        if (cl.Length == 0 || cl.Contains("--type=") || !IsDesktopApp(exe)) continue;
                         string id = "Default";
                         Match m = Regex.Match(cl, "--user-data-dir=(?:\"([^\"]+)\"|(\\S+))");
                         if (m.Success)
@@ -450,6 +450,14 @@ namespace ClawdDesktop
             }
             catch { }
             return map;
+        }
+
+        // O Claude Desktop da loja ou do instalador comum; o Claude Code também se chama claude.exe.
+        static bool IsDesktopApp(string exe)
+        {
+            if (exe.IndexOf("claude-code", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+            return exe.IndexOf("\\WindowsApps\\Claude_", StringComparison.OrdinalIgnoreCase) >= 0
+                || exe.IndexOf("\\AnthropicClaude\\", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         static string StartMenu { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft", "Windows", "Start Menu", "Programs"); } }
@@ -469,7 +477,11 @@ namespace ClawdDesktop
             string lnk = Path.Combine(StartMenu, "Claude - " + label + ".lnk");
             if (File.Exists(lnk)) Process.Start(new ProcessStartInfo(lnk) { UseShellExecute = true });
             else if (HasSwitcher) RunSwitcher("-Launch \"" + id + "\"");
-            else if (id == "Default") Process.Start(new ProcessStartInfo("shell:AppsFolder\\Claude_pzs8sxrjxfjjc!Claude") { UseShellExecute = true });
+            else if (id == "Default")
+            {
+                string plain = Path.Combine(StartMenu, "Claude.lnk");
+                Process.Start(new ProcessStartInfo(File.Exists(plain) ? plain : "shell:AppsFolder\\Claude_pzs8sxrjxfjjc!Claude") { UseShellExecute = true });
+            }
             else throw new InvalidOperationException("O Claude Profile Switcher não está instalado.");
         }
 
@@ -483,7 +495,7 @@ namespace ClawdDesktop
     {
         public string Key, Profile, Name, Emails = "";
         // tema do Claude
-        public bool ThemeOn = true, ThemeDefault = true;
+        public bool ThemeOn;
         public string Accent = "#d97757", Surface = "#d97757", Warning = "#c9801a", Success = "#2f8a5b", Danger = "#c23b32", Pro = "#3f6db3";
         // Clawd da área de trabalho
         public bool ShowClawd = true, Hat = true;
@@ -493,7 +505,7 @@ namespace ClawdDesktop
         public Dictionary<string, object> ToDict()
         {
             var t = new Dictionary<string, object>();
-            t["ativo"] = ThemeOn; t["padrao"] = ThemeDefault; t["principal"] = Accent; t["fundo"] = Surface;
+            t["ativo"] = ThemeOn; t["principal"] = Accent; t["fundo"] = Surface;
             t["aviso"] = Warning; t["sucesso"] = Success; t["erro"] = Danger; t["pro"] = Pro;
             var c = new Dictionary<string, object>();
             c["mostrar"] = ShowClawd; c["skin"] = Skin; c["skinFilhotes"] = PupSkin; c["corpo"] = Body; c["detalhe"] = Detail; c["chapeu"] = Hat;
@@ -516,8 +528,7 @@ namespace ClawdDesktop
             a.Name = Json.Str(d, "nome", a.Key);
             a.Emails = Json.Str(d, "emails", "");
             var t = Json.Obj(d, "tema");
-            a.ThemeOn = Json.Bool(t, "ativo", true);
-            a.ThemeDefault = Json.Bool(t, "padrao", true);
+            a.ThemeOn = Json.Bool(t, "ativo", false);
             a.Accent = HexOr(t, "principal", a.Accent);
             a.Surface = HexOr(t, "fundo", a.Accent);
             a.Warning = HexOr(t, "aviso", a.Warning);
@@ -539,6 +550,7 @@ namespace ClawdDesktop
     {
         public string Corner = "direito";
         public bool Events = true;
+        public bool IsNew;   // ainda não há config.json: quem leu deve gravar
         public readonly List<AccountCfg> Accounts = new List<AccountCfg>();
 
         public static string Dir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "clawd"); } }
@@ -548,8 +560,8 @@ namespace ClawdDesktop
         // Cores de partida para contas novas, em rodízio: principal, detalhe.
         public static readonly string[][] Starters =
         {
-            new[] { "#d97757", "#ffd23f" }, new[] { "#2f9e6b", "#ffd23f" }, new[] { "#e0559a", "#7fd6ff" },
-            new[] { "#3f6db3", "#ff9f43" }, new[] { "#c2412f", "#ffd23f" }, new[] { "#5d6672", "#5ee08a" },
+            new[] { "#d97757", "#ffd23f" }, new[] { "#3f7fe0", "#ffd23f" }, new[] { "#8b30e6", "#ff7eb6" },
+            new[] { "#2f9e6b", "#ffd23f" }, new[] { "#e0559a", "#7fd6ff" }, new[] { "#5d6672", "#5ee08a" },
         };
 
         static string Slug(string s)
@@ -566,8 +578,8 @@ namespace ClawdDesktop
             return r.Length == 0 ? "conta" : r;
         }
 
-        // A conta de um perfil que ainda não está na config. USP e Pessoal nascem com as
-        // cores que sempre tiveram.
+        // A conta de um perfil que ainda não está na config. A primeira fica com todos os
+        // e-mails ("*"); nas outras, quem diz de quem são é a pessoa, na Central.
         AccountCfg NewFor(ProfileInfo p)
         {
             var a = new AccountCfg();
@@ -578,26 +590,20 @@ namespace ClawdDesktop
             a.Key = k;
             a.Profile = p.Id;
             a.Name = p.Label;
-            if (k == "usp")
-            {
-                a.Emails = "usp.br";
-                a.Accent = a.Surface = a.Body = "#1094ab";
-                a.Warning = a.Detail = "#fcb421"; a.Success = "#2f8a5b"; a.Danger = "#c23b32"; a.Pro = "#3f6db3";
-            }
-            else if (k == "pessoal")
-            {
-                a.Emails = Accounts.Any(x => x.Emails.Trim() == "*") ? "" : "*";
-                a.Accent = a.Surface = a.Body = "#8b30e6";
-                a.Warning = "#c9801a"; a.Success = "#3d8b5f"; a.Danger = "#c23a4b"; a.Pro = "#d03fe0"; a.Detail = "#ff7eb6";
-            }
-            else
-            {
-                string[] st = Starters[Accounts.Count(x => x.Key != "usp" && x.Key != "pessoal") % Starters.Length];
-                a.Accent = a.Surface = a.Body = st[0];
-                a.Detail = st[1];
-                a.ThemeDefault = false;
-            }
+            a.Emails = Accounts.Count == 0 ? "*" : "";
+            string[] st = Starters[Accounts.Count % Starters.Length];
+            a.Accent = a.Surface = a.Body = st[0];
+            a.Detail = st[1];
             return a;
+        }
+
+        // Duas contas de mentira, para as fotos do README.
+        public static Cfg Sample()
+        {
+            var c = new Cfg();
+            c.Accounts.Add(new AccountCfg { Key = "trabalho", Profile = "Default", Name = "Trabalho", Emails = "empresa.com", ThemeOn = true, Accent = "#3f7fe0", Surface = "#3f7fe0", Warning = "#d9a21b", Pro = "#8a5cf6", Body = "#3f7fe0", Detail = "#ffd23f" });
+            c.Accounts.Add(new AccountCfg { Key = "pessoal", Profile = "Conta 2", Name = "Pessoal", Emails = "*", ThemeOn = true, Accent = "#8b30e6", Surface = "#8b30e6", Pro = "#d03fe0", Body = "#8b30e6", Detail = "#ff7eb6", Skin = "gato" });
+            return c;
         }
 
         // Lê a config e a acerta com os perfis que existem: perfil novo ganha uma conta,
@@ -608,6 +614,7 @@ namespace ClawdDesktop
             var d = Json.Read(FilePath);
             if (d == null)
             {
+                c.IsNew = true;
                 // antes da Central, o canto ficava em desktop.json
                 c.Corner = Json.Str(Json.Read(Path.Combine(Dir, "desktop.json")), "canto", "direito");
             }

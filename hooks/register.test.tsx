@@ -22,14 +22,15 @@ function engine(on: T[1], email: string, themes: unknown[]) {
   on('ui.open', () => ({ value: { isPlaced: true } }))
 }
 
-test('cada conta recebe o tema dela com o Clawd no fundo', async ($, on) => {
+test('sem config, o Clawd vai para o fundo e as cores ficam as do app', async ($, on) => {
   const themes: Array<{ colors?: unknown; backdrop?: { scene?: string } }> = []
   engine(on, 'alguem@usp.br', themes)
   await $.session.start({ cwd: 'C:/proj/x', surface: 'desktop', isInteractive: true })
 
+  // Sem config não há tema: só o Clawd no fundo.
   expect(themes.length).toBe(1)
   expect(themes[0]?.backdrop?.scene).toBe('clawd')
-  expect(themes[0]?.colors).toBeDefined()
+  expect(themes[0]?.colors).toBeUndefined()
 })
 
 test('o indicador mostra a animação da ferramenta em uso', async ($, on) => {
@@ -115,11 +116,11 @@ test('limites e sessão vão para a pasta que o Clawd do Windows lê', async ($,
 
   // O motor entrega o caminho no formato do Windows; basta achar pelo fim.
   const written = (end: string) => Object.entries(writes).find(([k]) => k.split(String.fromCharCode(92)).join('/').endsWith(end))?.[1] ?? '{}'
-  const uso = JSON.parse(written('/.claude/clawd/uso-usp.json'))
+  const uso = JSON.parse(written('/.claude/clawd/uso-claude.json'))
   expect(uso.rateLimits?.[0]?.kind).toBe('five_hour')
   expect(uso.rateLimits?.[1]?.percentUsed).toBe(9)
   const sessao = JSON.parse(written('/.claude/clawd/sessions/sessao-teste.json'))
-  expect(sessao.account).toBe('usp')
+  expect(sessao.account).toBe('claude')
   expect(sessao.costUsd).toBe(1.25)
   expect(sessao.contextPercent).toBe(12)
 })
@@ -142,10 +143,16 @@ test('o tipo do comando ou do arquivo vira detalhe, sem o texto dele', () => {
 })
 
 test('conta pelo domínio do e-mail', () => {
-  expect(accountOf('a@usp.br')).toBe('usp')
-  expect(accountOf('a@ime.usp.br')).toBe('usp')
-  expect(accountOf('a@fakeusp.br')).toBe('pessoal')
-  expect(accountOf(undefined)).toBe('outra')
+  const contas = [
+    { chave: 'usp', nome: 'USP', emails: 'usp.br' },
+    { chave: 'pessoal', nome: 'Pessoal', emails: '*' },
+  ]
+  expect(accountOf('a@usp.br', contas)).toBe('usp')
+  expect(accountOf('a@ime.usp.br', contas)).toBe('usp')
+  expect(accountOf('a@fakeusp.br', contas)).toBe('pessoal')
+  expect(accountOf(undefined, contas)).toBe('outra')
+  // sem config, tudo é de uma conta só
+  expect(accountOf('a@qualquer.com')).toBe('claude')
 })
 
 test('a config da Central decide a conta e o tema', async ($, on) => {
@@ -179,7 +186,7 @@ test('a config da Central decide a conta e o tema', async ($, on) => {
   on('fs.list', () => ({ value: [] }))
   on('fs.write', () => ({ value: undefined }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [] } }))
-  const config = { contas: [{ ...contas[0], tema: { ativo: true, padrao: false, principal: '#2f9e6b', fundo: '#2f9e6b' } }, contas[1]] }
+  const config = { contas: [{ ...contas[0], tema: { ativo: true, principal: '#2f9e6b', fundo: '#2f9e6b' } }, contas[1]] }
   on('fs.read', (_, e) => ({ value: e.path.endsWith('config.json') ? JSON.stringify(config) : '{}' }))
   await $.session.start({ cwd: 'C:/proj/x', surface: 'desktop', isInteractive: true })
 

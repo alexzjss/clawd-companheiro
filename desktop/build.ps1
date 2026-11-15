@@ -1,8 +1,9 @@
 # Compila os Clawds da area de trabalho e a Central dos Clawds com o csc do .NET Framework 4
-# (vem com o Windows). Uso: powershell -File build.ps1 [-Out <pasta>] [-Only desktop|central]
+# (vem com o Windows). Uso: powershell -File build.ps1 [-Out <pasta>] [-Only desktop|central] [-Setup]
 param(
   [string]$Out = (Join-Path $env:USERPROFILE '.claude\clawd\app'),
-  [string]$Only = ''
+  [string]$Only = '',
+  [switch]$Setup   # tambem monta o instalador ClawdSetup.exe, com os dois programas dentro
 )
 
 $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
@@ -19,7 +20,9 @@ $refs = @(
   (Join-Path $fw 'System.Management.dll'),
   (Join-Path $fw 'System.Web.Extensions.dll'),
   (Join-Path $fw 'System.Windows.Forms.dll'),
-  (Join-Path $fw 'System.Drawing.dll')
+  (Join-Path $fw 'System.Drawing.dll'),
+  (Join-Path $fw 'Microsoft.CSharp.dll'),
+  (Join-Path $fw 'System.Core.dll')
 ) | ForEach-Object { "/r:$_" }
 
 # O desenho do Clawd e a config sao os mesmos nos dois programas.
@@ -39,3 +42,14 @@ function Build([string]$name, [string]$source) {
 
 if ($Only -ne 'central') { Build 'ClawdDesktop' 'ClawdDesktop.cs' }
 if ($Only -ne 'desktop') { Build 'ClawdCentral' 'ClawdCentral.cs' }
+
+if ($Setup) {
+  $exe = Join-Path $Out 'ClawdSetup.exe'
+  $cscArgs = @('/nologo', '/target:winexe', '/optimize+', '/codepage:65001', "/out:$exe") + $refs
+  foreach ($p in 'ClawdDesktop.exe', 'ClawdCentral.exe') { $cscArgs += "/resource:$(Join-Path $Out $p),$p" }
+  if (Test-Path $icon) { $cscArgs += "/win32icon:$icon" }
+  $cscArgs += (Join-Path $PSScriptRoot 'ClawdSetup.cs')
+  & (Join-Path $fw 'csc.exe') @cscArgs
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  Write-Output "ok: $exe"
+}
