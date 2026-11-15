@@ -1,0 +1,7 @@
+{
+  "nome": "Cartola",
+  "partes": [
+    { "camada": "frente", "ancora": "topo", "x": -5, "y": -7,
+      "arte": ["..xxxxxx..", "..xxxxxx..", "..xxxxxx..", "..xxxxxx..", "..aaaaaa..", "xxxxxxxxxx"] }
+  ]
+}

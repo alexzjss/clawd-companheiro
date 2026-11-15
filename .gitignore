@@ -1,0 +1,9 @@
+# programas compilados e sobras
+*.exe
+*.pdb
+*.bak
+bin/
+# tipos que o Claude Code grava ao carregar o mod
+.claude-plugin/types/
+tsconfig.json
+node_modules/
