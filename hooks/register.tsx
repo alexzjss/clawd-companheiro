@@ -5,6 +5,8 @@ import type { Account, Activity, ActivityKind, Memory, Mood, SessionInfo } from 
 import { PALETTES, animForTool, animSvg, clawdSvg } from './sprites'
 import type { AnimName } from './sprites'
 import { customTheme } from './themes'
+import { PASSING, RELAY_BACKOFF_MS, gistHeaders, relayDue, relayFile, relayFrom, relayKey, relayPayload, staleFiles, withHold } from './relay'
+import type { Relay } from './relay'
 import type { ContaTema } from './themes'
 
 const PLUGIN = 'clawd-companheiro'
@@ -248,6 +250,15 @@ const st = {
   contas: CONTAS_PADRAO,
   themeKey: '',
   ticks: 0,
+  // o envio para o Gist (sessões fora do PC dos Clawds)
+  email: '',
+  relay: undefined as Relay | undefined,
+  relayInfo: undefined as SessionInfo | undefined,
+  relayHold: undefined as { kind: ActivityKind; since: number } | undefined,
+  relayLast: 0,
+  relayKey: '',
+  relayBusy: false,
+  relayPruned: false,
 }
 
 const AGENT_FRESH_MS = 20_000
@@ -285,7 +296,7 @@ async function measureNow($: E) {
 }
 
 async function writeSession($: E, force: boolean) {
-  if (st.dir === '' || st.sessionId === '') return
+  if ((st.dir === '' && st.relay === undefined) || st.sessionId === '') return
   const now = await $.clock.now()
   if (!force && now - st.lastWrite < HEARTBEAT_MS) return
   st.lastWrite = now
@@ -301,6 +312,8 @@ async function writeSession($: E, force: boolean) {
     ...(st.costUsd !== undefined ? { costUsd: st.costUsd } : {}),
     ...(st.contextPercent !== undefined ? { contextPercent: st.contextPercent } : {}),
   }
+  st.relayInfo = info
+  if (st.dir === '') return
   try {
     await $.fs.write(`${st.dir}/sessions/${st.sessionId}.json`, JSON.stringify(info))
   } catch {
@@ -308,7 +321,63 @@ async function writeSession($: E, force: boolean) {
   }
 }
 
+type FetchReply = { status?: number; text?: string }
+
+async function gist($: E, r: Relay, method: 'GET' | 'PATCH', body?: unknown): Promise<FetchReply> {
+  const reply = (await $.http.fetch(`https://api.github.com/gists/${r.gist}`, {
+    method,
+    headers: gistHeaders(r),
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  })) as unknown as FetchReply & { value?: FetchReply }
+
+  return reply.value ?? reply
+}
+
+// Tira do Gist as sessões de ontem para trás (uma vez por sessão).
+async function pruneRelay($: E, r: Relay, now: number, keep: string) {
+  const got = await gist($, r, 'GET')
+  if (got.status !== 200 || got.text === undefined) return
+  const files = (JSON.parse(got.text) as { files?: Record<string, { content?: string } | null> }).files ?? {}
+  const old = staleFiles(files, now, keep).slice(0, 40)
+  if (old.length > 0) await gist($, r, 'PATCH', { files: Object.fromEntries(old.map(n => [n, null])) })
+}
+
+// Manda o estado desta sessão para o Gist, sem passar do ritmo que o GitHub aceita.
+async function flushRelay($: E, ended = false) {
+  const r = st.relay
+  const info = st.relayInfo
+  if (r === undefined || info === undefined || st.relayBusy) return
+  const now = await $.clock.now()
+  const payload = relayPayload(withHold(info, st.relayHold), r.origin, st.email)
+  const key = relayKey(payload)
+  if (!relayDue(now, st.relayLast, st.relayKey, key, ended)) return
+  st.relayBusy = true
+  st.relayLast = now
+  try {
+    const file = relayFile(info.id)
+    if (!st.relayPruned) {
+      st.relayPruned = true
+      await pruneRelay($, r, now, file).catch(() => undefined)
+    }
+    const sent = await gist($, r, 'PATCH', { files: { [file]: { content: JSON.stringify(payload) } } })
+    if (sent.status === 200) {
+      st.relayKey = key
+      if (st.relayHold !== undefined && payload.state === st.relayHold.kind) st.relayHold = undefined
+    } else if (sent.status === 401 || sent.status === 404) {
+      // Gist ou token errados: para de tentar nesta sessão.
+      st.relay = undefined
+    } else if (sent.status === 403 || sent.status === 429) {
+      st.relayLast = now + RELAY_BACKOFF_MS
+    }
+  } catch {
+    // sem rede ou sem permissão para api.github.com: tenta de novo na próxima volta
+  } finally {
+    st.relayBusy = false
+  }
+}
+
 async function setActivity($: E, next: Activity) {
+  if (PASSING.includes(next.kind)) st.relayHold = { kind: next.kind, since: next.since }
   await update($, activity, () => next)
   await writeSession($, true)
 }
@@ -354,6 +423,15 @@ async function refreshSessions($: E) {
   if (JSON.stringify(old) !== JSON.stringify(top)) await update($, sessions, () => top)
 }
 
+// O ClawdDesktop instalado nesta máquina: aí quem mostra é ele, lendo o disco.
+async function hasDesktop($: E): Promise<boolean> {
+  try {
+    return (await $.fs.list(st.dir)).some(f => f.name === 'app' && f.kind === 'dir')
+  } catch {
+    return false
+  }
+}
+
 // As contas e os temas que a Central gravou. Sem o arquivo, ficam as contas de sempre.
 async function loadConfig($: E) {
   if (st.dir === '') return
@@ -396,6 +474,7 @@ async function tick($: E) {
   }
   await refreshMood($)
   await writeSession($, agentCount(now) !== st.lastAgents)
+  await flushRelay($)
   await refreshSessions($)
 }
 
@@ -462,6 +541,8 @@ export const register: Register = on => {
     turnActive: false, lastWrite: 0, dir: '', memory: emptyMemory(0), ended: false,
     turns: 0, turnStartedAt: 0, costUsd: undefined, contextPercent: undefined,
     agents: {}, lastAgents: 0, model: '', contas: CONTAS_PADRAO, themeKey: '', ticks: 0,
+    email: '', relay: undefined, relayInfo: undefined, relayHold: undefined, relayLast: 0, relayKey: '',
+    relayBusy: false, relayPruned: false,
   })
 
   on('session.measure', async ($, e, next) => {
@@ -478,10 +559,23 @@ export const register: Register = on => {
     st.label = st.cwd.split(/[\\/]/).filter(Boolean).pop() ?? 'sessão'
     st.startedAt = now
     st.lastActive = now
-    const home = await $.env.get('USERPROFILE')
+    // No Windows a pasta é a que o ClawdDesktop lê; fora dele (nuvem, Mac, Linux) ela serve
+    // só para o painel /clawd desta máquina.
+    const profile = await $.env.get('USERPROFILE')
+    const home = profile ?? (await $.env.get('HOME'))
     st.dir = home ? `${home}/.claude/clawd` : ''
     await loadConfig($)
-    st.account = accountOf(await $.env.get('CLAUDE_CODE_USER_EMAIL'), st.contas)
+    st.email = (await $.env.get('CLAUDE_CODE_USER_EMAIL')) ?? ''
+    st.account = accountOf(st.email, st.contas)
+    st.relay = relayFrom(
+      {
+        gist: await $.env.get('CLAWD_GIST_ID'),
+        token: await $.env.get('CLAWD_GITHUB_TOKEN'),
+        remote: await $.env.get('CLAUDE_CODE_REMOTE'),
+        force: await $.env.get('CLAWD_RELAY'),
+      },
+      profile !== undefined && (await hasDesktop($)),
+    )
 
     // Memória da conta: cumprimenta conforme o que lembra, depois atualiza.
     if (st.dir !== '') {
@@ -601,6 +695,7 @@ export const register: Register = on => {
     st.ended = true
     await update($, activity, () => ({ kind: 'dormindo', since: 0 }) as Activity)
     await writeSession($, true)
+    await flushRelay($, true).catch(() => undefined)
 
     return next(e)
   })

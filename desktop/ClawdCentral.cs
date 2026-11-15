@@ -255,6 +255,7 @@ namespace ClawdDesktop
         Popup picker;
         bool busy;
         readonly bool photo;   // fotos do README: contas de mentira, nada é gravado
+        bool relayPage;        // a página das sessões de fora deste PC no lugar da conta
 
         readonly StackPanel accountList = new StackPanel();
         readonly StackPanel globalBox = new StackPanel();
@@ -418,7 +419,7 @@ namespace ClawdDesktop
             if (!saveTimer.IsEnabled && Cfg.Stamp() != stamp) reload = true;
             string s = string.Join(",", run.Keys.OrderBy(x => x).ToArray()) + "/" +
                        string.Join(",", act.OrderBy(x => x.Key).Select(x => x.Key + x.Value).ToArray()) + "/" + overlay;
-            bool typing = Keyboard.FocusedElement is TextBox;
+            bool typing = Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is PasswordBox;
             bool picking = picker != null && picker.IsOpen;
             if (typing || picking) return;   // não mexe na tela embaixo de quem está escolhendo
             if (reload) Reload();
@@ -460,7 +461,7 @@ namespace ClawdDesktop
         {
             blinkers.Clear();
             BuildSidebar();
-            detail.Content = sel != null ? BuildDetail(sel) : Ui.T("Nenhuma conta do Claude encontrada.", 14, Ui.Dim, false);
+            detail.Content = relayPage ? BuildRelay() : sel != null ? BuildDetail(sel) : Ui.T("Nenhuma conta do Claude encontrada.", 14, Ui.Dim, false);
         }
 
         void BuildSidebar()
@@ -469,7 +470,7 @@ namespace ClawdDesktop
             foreach (var acc in cfg.Accounts)
             {
                 var a = acc;
-                bool on = a == sel;
+                bool on = a == sel && !relayPage;
                 var row = new Grid();
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -496,7 +497,7 @@ namespace ClawdDesktop
                 card.Child = row;
                 card.MouseEnter += delegate { if (a != sel) card.Background = Ui.Soft; };
                 card.MouseLeave += delegate { if (a != sel) card.Background = Brushes.Transparent; };
-                card.MouseLeftButtonUp += delegate { sel = a; RenderAll(); detail.ScrollToTop(); };
+                card.MouseLeftButtonUp += delegate { sel = a; relayPage = false; RenderAll(); detail.ScrollToTop(); };
                 accountList.Children.Add(card);
             }
 
@@ -540,6 +541,18 @@ namespace ClawdDesktop
             }
             globalBox.Children.Add(corner);
             globalBox.Children.Add(Ui.Check("Brincadeiras entre eles de tempo em tempo", cfg.Events, delegate(bool v) { cfg.Events = v; Changed(false); }));
+
+            // as sessões de fora deste PC
+            var far = new DockPanel { Margin = new Thickness(0, 6, 0, 0) };
+            var open = Ui.Button(relayPage ? "Aberto" : "Configurar", null, delegate { relayPage = true; RenderAll(); detail.ScrollToTop(); });
+            open.Margin = new Thickness(0);
+            DockPanel.SetDock(open, Dock.Right);
+            far.Children.Add(open);
+            var farText = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            farText.Children.Add(Ui.T("Nuvem e outros PCs", 13, Ui.Text, true));
+            farText.Children.Add(Ui.T(cfg.HasRelay ? "pelo Gist" : "desligado", 11.5, cfg.HasRelay ? Ui.Good : Ui.Dim, false));
+            far.Children.Add(farText);
+            globalBox.Children.Add(far);
         }
 
         UIElement BuildDetail(AccountCfg a)
@@ -598,6 +611,93 @@ namespace ClawdDesktop
 
             sp.Children.Add(Ui.Section("Tema do Claude", "As cores do app nesta conta. Sessões abertas trocam em alguns segundos.", BuildTheme(a)));
             sp.Children.Add(Ui.Section("Clawd na área de trabalho", "O mascote desta conta em cima da barra de tarefas.", BuildClawd(a)));
+            return sp;
+        }
+
+        // ---- sessões de fora deste PC
+
+        // Aceita o ID ou o endereço inteiro do Gist (gist.github.com/usuario/<id>).
+        static string GistIdOf(string text)
+        {
+            string t = (text ?? "").Trim().TrimEnd('/');
+            int slash = t.LastIndexOf('/');
+            if (slash >= 0) t = t.Substring(slash + 1);
+            int hash = t.IndexOf('#');
+            if (hash >= 0) t = t.Substring(0, hash);
+            return t;
+        }
+
+        static TextBlock Para(string text)
+        {
+            var t = Ui.T(text, 12.5, Ui.Dim, false);
+            t.TextWrapping = TextWrapping.Wrap;
+            t.Margin = new Thickness(0, 0, 0, 8);
+            return t;
+        }
+
+        static TextBox CodeBox(string text)
+        {
+            return new TextBox
+            {
+                Text = text, IsReadOnly = true, FontFamily = Ui.Mono, FontSize = 12.5, Padding = new Thickness(8, 5, 8, 5),
+                Background = Ui.Soft, Foreground = Ui.Text, BorderBrush = Ui.Line, Margin = new Thickness(0, 0, 0, 8),
+                HorizontalAlignment = HorizontalAlignment.Left, MinWidth = 320, TextWrapping = TextWrapping.Wrap,
+            };
+        }
+
+        void OpenUrl(string url) { Try(delegate { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }); }
+
+        UIElement BuildRelay()
+        {
+            var sp = new StackPanel { Margin = new Thickness(26, 22, 26, 26), MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left };
+            sp.Children.Add(Ui.T("Sessões de fora deste PC", 24, Ui.Text, true));
+            var lead = Para("Sessões na nuvem do claude.ai (pelo app, pela web, pelo celular, tarefas agendadas) e em outros computadores também viram filhotes do Clawd da conta, com uma nuvenzinha. Elas mandam o estado para um Gist secreto do GitHub, e os Clawds leem de lá a cada 15 segundos.");
+            lead.Margin = new Thickness(0, 6, 0, 16);
+            sp.Children.Add(lead);
+
+            // ---- o Gist
+            var g = new StackPanel();
+            g.Children.Add(Para("1. Crie um Gist secreto com qualquer arquivo (por exemplo LEIA-ME.md) e cole aqui o endereço ou o ID dele."));
+            var idBox = new TextBox { Text = cfg.GistId, FontFamily = Ui.Mono, FontSize = 13, Padding = new Thickness(8, 6, 8, 6), Background = Ui.Soft, Foreground = Ui.Text, CaretBrush = Ui.Text, BorderBrush = Ui.Line, MinWidth = 320, MaxWidth = 460, HorizontalAlignment = HorizontalAlignment.Left };
+            var idWarn = Ui.T("", 12, Pal.B("#f5a524", 1), false);
+            idWarn.Margin = new Thickness(0, 6, 0, 10);
+            Action checkId = delegate
+            {
+                bool bad = cfg.GistId.Length > 0 && !cfg.HasRelay;
+                idWarn.Text = bad ? "Isso não parece o ID de um Gist (letras de a a f e números)." : "";
+                idWarn.Visibility = bad ? Visibility.Visible : Visibility.Collapsed;
+            };
+            idBox.TextChanged += delegate { cfg.GistId = GistIdOf(idBox.Text); checkId(); Changed(false); };
+            g.Children.Add(idBox);
+            g.Children.Add(idWarn);
+            checkId();
+            g.Children.Add(Para("2. Crie um token do GitHub só com a permissão \"gist\" e cole aqui. Ele fica em nuvem.json, nesta máquina, e serve para os Clawds lerem o Gist sem esbarrar no limite do GitHub."));
+            var tok = new PasswordBox { Password = cfg.GistToken, FontFamily = Ui.Mono, FontSize = 13, Padding = new Thickness(8, 6, 8, 6), Background = Ui.Soft, Foreground = Ui.Text, CaretBrush = Ui.Text, BorderBrush = Ui.Line, MinWidth = 320, MaxWidth = 460, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 10) };
+            tok.PasswordChanged += delegate { cfg.GistToken = tok.Password.Trim(); Changed(false); };
+            g.Children.Add(tok);
+            var links = new WrapPanel();
+            links.Children.Add(Ui.Button("Criar o Gist", null, delegate { OpenUrl("https://gist.github.com/"); }));
+            links.Children.Add(Ui.Button("Criar o token", null, delegate { OpenUrl("https://github.com/settings/tokens/new?scopes=gist&description=Clawd%20Companheiro"); }));
+            g.Children.Add(links);
+            sp.Children.Add(Ui.Section("O Gist", "Secreto não quer dizer trancado: quem tiver o endereço lê. Vão para lá o assunto de cada sessão, o nome da pasta, o estado, o modelo e o e-mail da conta, nunca comandos, caminhos ou conteúdo.", g));
+
+            // ---- na nuvem
+            string id = cfg.HasRelay ? cfg.GistId : "<id do gist>";
+            var n = new StackPanel();
+            n.Children.Add(Para("No ambiente da nuvem que as sessões usam (claude.ai/code, Configurações do ambiente):"));
+            n.Children.Add(Para("• Variável de ambiente:"));
+            n.Children.Add(CodeBox("CLAWD_GIST_ID=" + id));
+            n.Children.Add(Para("• Acesso à rede: deixe api.github.com liberado."));
+            n.Children.Add(Para("• Segredo de rede para api.github.com com o token (cabeçalho Authorization: Bearer). Assim o token não fica dentro do container; o proxy do ambiente põe ele nas chamadas."));
+            n.Children.Add(Para("O mod clawd-companheiro precisa estar ligado nas sessões da nuvem. Sem isso, nada é enviado."));
+            sp.Children.Add(Ui.Section("Sessões na nuvem", "Uma vez por ambiente.", n));
+
+            // ---- outro computador
+            var o = new StackPanel();
+            o.Children.Add(Para("Num computador sem os Clawds (Mac, Linux, outro Windows), com o mod instalado no Claude Code, defina antes de abrir o Claude:"));
+            o.Children.Add(CodeBox("CLAWD_GIST_ID=" + id + "\nCLAWD_GITHUB_TOKEN=<o token>"));
+            o.Children.Add(Para("Num Windows que também tem os Clawds, as sessões só aparecem nele. Para que mandem ao Gist mesmo assim, defina CLAWD_RELAY=1. CLAWD_RELAY=0 desliga o envio em qualquer máquina."));
+            sp.Children.Add(Ui.Section("Sessões em outros computadores", "Elas aparecem com ⇄ no painel do Clawd.", o));
             return sp;
         }
 
