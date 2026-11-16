@@ -69,7 +69,7 @@ export type SessionInfo = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'clawd-companheiro': {
+    'clawdesk': {
       activity: Activity
       mood: Mood
       sessions: SessionInfo[]

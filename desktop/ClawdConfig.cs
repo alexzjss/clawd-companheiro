@@ -1,4 +1,4 @@
-// O que os Clawds da área de trabalho e a Central dos Clawds têm em comum:
+﻿// O que os Clawds da área de trabalho e a Central dos Clawds têm em comum:
 //   config.json   as contas (uma por perfil do Claude Desktop), as cores do tema de cada
 //                 uma e a aparência do Clawd dela
 //   skins         acessórios em pixel art que vestem o Clawd (as de fábrica ficam aqui no
@@ -19,7 +19,7 @@ using System.Text.RegularExpressions;
 using System.Web.Script.Serialization;
 using System.Windows.Media;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     // ------------------------------------------------------------------- json --
 
@@ -243,46 +243,46 @@ namespace ClawdDesktop
         public static List<Skin> Builtin()
         {
             var l = new List<Skin>();
-            l.Add(New("classico", "Clássico"));
-            l.Add(New("gato", "Gatinho")
+            l.Add(New("classico", L.T("Clássico", "Classic")));
+            l.Add(New("gato", L.T("Gatinho", "Kitty"))
                 .Add("tras", "topo", -8, -5, "..k..", ".kbk.", "kbPbk", "kbPbk")
                 .Add("tras", "topo", 3, -5, "..k..", ".kbk.", "kbPbk", "kbPbk")
                 .Add("tras", "costas", -6, 2, "kk....", "kbk...", "kbk...", ".kbk..", ".kbbkk", "..kbbb", "...kkk"));
-            l.Add(New("coelho", "Coelho")
+            l.Add(New("coelho", L.T("Coelho", "Bunny"))
                 .Add("tras", "topo", -6, -8, ".k.", "kbk", "kPk", "kPk", "kPk", "kbk", "kbk")
                 .Add("tras", "topo", 3, -8, ".k.", "kbk", "kPk", "kPk", "kPk", "kbk", "kbk")
                 .Add("tras", "costas", -3, 5, ".kk.", "kwwk", "kwwk", ".kk."));
-            l.Add(New("urso", "Ursinho")
+            l.Add(New("urso", L.T("Ursinho", "Teddy"))
                 .Add("tras", "topo", -8, -4, ".kk.", "kbbk", "kdbk")
                 .Add("tras", "topo", 4, -4, ".kk.", "kbbk", "kbdk")
                 .Add("corpo", "corpo", 5, 5, ".llll.", "llllll", "llllll", ".llll."));
-            l.Add(New("robo", "Robô")
+            l.Add(New("robo", L.T("Robô", "Robot"))
                 .Add("tras", "topo", -2, -6, ".aa.", ".aa.", ".kk.", ".kk.", ".kk.")
                 .Add("corpo", "corpo", 0, 0, "gggggggggggggggg")
                 .Add("corpo", "corpo", 0, 8, "GGGGGGGGGGGGGGGG")
                 .Add("corpo", "corpo", 10, 7, "r.y.n")
                 .Add("corpo", "corpo", 1, 7, "GGG"));
-            l.Add(New("diabinho", "Diabinho")
+            l.Add(New("diabinho", L.T("Diabinho", "Little devil"))
                 .Add("tras", "topo", -8, -4, "kk..", "kak.", "kaak")
                 .Add("tras", "topo", 4, -4, "..kk", ".kak", "kaak")
                 .Add("tras", "costas", -5, 2, ".k...", "kak..", "kaak.", ".kk..", "..ak.", "...ak", "....a"));
-            l.Add(New("anjo", "Anjinho")
+            l.Add(New("anjo", L.T("Anjinho", "Little angel"))
                 .Add("frente", "topo", -4, -5, ".yyyyyy.", "y......y", ".yyyyyy.")
                 .Add("tras", "costas", -5, 0, "..ww.", ".wwww", "wwwiw", "wwiww", ".wwww", "..wi."));
             l.Add(New("dino", "Dino")
                 .Add("tras", "topo", -7, -3, ".a...a...a...a.", "aaa.aaa.aaa.aaa")
                 .Add("tras", "costas", -7, 4, ".....kk", "...kkbb", ".kkbbbb", "kbbbbbb", "kkkkkkk"));
-            l.Add(New("unicornio", "Unicórnio")
+            l.Add(New("unicornio", L.T("Unicórnio", "Unicorn"))
                 .Add("frente", "topo", 2, -5, "...y", "..yw", ".yy.", "yy..")
                 .Add("tras", "topo", -8, -3, ".PPcc...", "PPccvv..", "PccvvPP.")
                 .Add("tras", "costas", -4, 3, ".PP.", "PccP", "cvvc", ".PP.", ".cv."));
             l.Add(New("bandana", "Bandana")
                 .Add("corpo", "corpo", 0, 0, "aaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaa")
                 .Add("tras", "costas", -3, 0, "aa..", ".aaa", "aa..", "a..."));
-            l.Add(New("cachecol", "Cachecol")
+            l.Add(New("cachecol", L.T("Cachecol", "Scarf"))
                 .Add("corpo", "corpo", 0, 7, "aaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaa")
                 .Add("frente", "corpo", 2, 9, "aaa", "aaa", "a.a"));
-            l.Add(New("flor", "Florzinha")
+            l.Add(New("flor", L.T("Florzinha", "Flower"))
                 .Add("frente", "topo", -7, -3, ".P.P.", "PPyPP", ".PyP.", "..n..")
                 .Add("corpo", "corpo", 1, 5, "PP")
                 .Add("corpo", "corpo", 13, 5, "PP"));
@@ -295,21 +295,37 @@ namespace ClawdDesktop
             if (d == null) return null;
             var s = new Skin();
             s.Id = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
-            s.Name = Json.Str(d, "nome", s.Id);
+            s.Name = Json.Str(d, "nome", Json.Str(d, "name", s.Id));
             s.Custom = true;
-            foreach (object o in Json.Arr(d, "partes"))
+            var parts = Json.Arr(d, "partes");
+            if (parts.Length == 0) parts = Json.Arr(d, "parts");
+            foreach (object o in parts)
             {
                 var x = o as Dictionary<string, object>;
                 if (x == null) continue;
                 var p = new SkinPart();
-                p.Layer = Json.Str(x, "camada", "frente");
-                p.Anchor = Json.Str(x, "ancora", "topo");
+                p.Layer = Word(Json.Str(x, "camada", Json.Str(x, "layer", "frente")), false);
+                p.Anchor = Word(Json.Str(x, "ancora", Json.Str(x, "anchor", "topo")), true);
                 p.X = Json.Int(x, "x", 0);
                 p.Y = Json.Int(x, "y", 0);
-                p.Art = Json.Arr(x, "arte").Select(r => Convert.ToString(r)).Where(r => r.Length <= 40).Take(40).ToArray();
+                p.Art = (Json.Arr(x, "arte").Length > 0 ? Json.Arr(x, "arte") : Json.Arr(x, "art")).Select(r => Convert.ToString(r)).Where(r => r.Length <= 40).Take(40).ToArray();
                 s.Parts.Add(p);
             }
             return s;
+        }
+
+        // As palavras em inglês das skins viram as de sempre.
+        static string Word(string w, bool anchor)
+        {
+            switch ((w ?? "").ToLowerInvariant())
+            {
+                case "back": return anchor ? "costas" : "tras";
+                case "body": return "corpo";
+                case "front": return "frente";
+                case "top": return "topo";
+                case "bottom": return "base";
+                default: return w;
+            }
         }
 
         // Todas as skins: as de fábrica e as da pasta (que não trocam uma de fábrica).
@@ -341,11 +357,11 @@ namespace ClawdDesktop
             try
             {
                 Directory.CreateDirectory(dir);
-                string guide = Path.Combine(dir, "LEIA-ME.txt");
+                string guide = Path.Combine(dir, L.T("LEIA-ME.txt", "README.txt"));
                 if (!File.Exists(guide))
-                    File.WriteAllText(guide,
+                    File.WriteAllText(guide, L.T(
                         "Skins dos Clawds\r\n================\r\n\r\n" +
-                        "Cada arquivo .json desta pasta vira uma skin na Central dos Clawds (o nome do arquivo é o id).\r\n" +
+                        "Cada arquivo .json desta pasta vira uma skin no Clawdesk (o nome do arquivo é o id).\r\n" +
                         "Uma skin é uma lista de peças de pixel art presas a um ponto do corpo:\r\n\r\n" +
                         "  camada  tras (atrás do corpo), corpo (por cima do corpo, sob o rosto) ou frente\r\n" +
                         "  ancora  topo ou base (x=0 é o centro do corpo), costas ou frente (a borda do corpo),\r\n" +
@@ -357,7 +373,23 @@ namespace ClawdDesktop
                         "Cores: b corpo, l brilho, d sombra, k contorno, a detalhe (as cinco mudam com a conta),\r\n" +
                         "w branco, i gelo, g cinza claro, G cinza, h grafite, x preto, y amarelo, Y ocre, f laranja,\r\n" +
                         "r vermelho, R vinho, P rosa, v roxo, V roxo escuro, u azul, U azul escuro, c azul claro,\r\n" +
-                        "n verde, N verde escuro, o madeira, O madeira escura, p papel.\r\n", Encoding.UTF8);
+                        "n verde, N verde escuro, o madeira, O madeira escura, p papel.\r\n",
+                        "Clawd skins\r\n===========\r\n\r\n" +
+                        "Each .json file in this folder becomes a skin in Clawdesk (the file name is its id).\r\n" +
+                        "A skin is a list of pixel-art pieces pinned to a point on the body:\r\n\r\n" +
+                        "  layer   back (behind the body), body (over the body, under the face) or front\r\n" +
+                        "  anchor  top or bottom (x=0 is the center of the body), back or front (the body edge),\r\n" +
+                        "          body (the top corner, on the back side)\r\n" +
+                        "  x, y    where the top corner of the art sits relative to the anchor (negative y goes up)\r\n" +
+                        "  art     the rows; each letter is a color and a dot is transparent\r\n\r\n" +
+                        "The body is 16 pixels wide (x from -8 to 7) and 9 tall. The Clawd faces right;\r\n" +
+                        "when it turns, the skin mirrors along.\r\n\r\n" +
+                        "Colors: b body, l highlight, d shade, k outline, a detail (these five follow the account),\r\n" +
+                        "w white, i ice, g light gray, G gray, h graphite, x black, y yellow, Y ochre, f orange,\r\n" +
+                        "r red, R wine, P pink, v purple, V dark purple, u blue, U dark blue, c light blue,\r\n" +
+                        "n green, N dark green, o wood, O dark wood, p paper.\r\n" +
+                        "The Portuguese keys (nome, partes, camada, ancora, arte; tras, corpo, frente, topo, base, costas)\r\n" +
+                        "work too, as in the bundled example.\r\n"), Encoding.UTF8);
                 string sample = Path.Combine(dir, "exemplo-cartola.json");
                 if (!File.Exists(sample))
                     File.WriteAllText(sample,
@@ -477,7 +509,7 @@ namespace ClawdDesktop
                 string plain = Path.Combine(StartMenu, "Claude.lnk");
                 Process.Start(new ProcessStartInfo(File.Exists(plain) ? plain : "shell:AppsFolder\\Claude_pzs8sxrjxfjjc!Claude") { UseShellExecute = true });
             }
-            else throw new InvalidOperationException("O Claude Profile Switcher não está instalado.");
+            else throw new InvalidOperationException(L.T("O Claude Profile Switcher não está instalado.", "Claude Profile Switcher is not installed."));
         }
 
         public static void AddAccount() { RunSwitcher("-AddAccount"); }
@@ -541,7 +573,7 @@ namespace ClawdDesktop
         }
     }
 
-    // Quando o Clawd Companheiro avisa pelo Windows.
+    // Quando o Clawdesk avisa pelo Windows.
     sealed class NotifyCfg
     {
         public bool On = true, Done = true, Error = true, Waiting = true, Sound = false;
@@ -577,6 +609,7 @@ namespace ClawdDesktop
         public string Corner = "direito";
         public bool Events = true;
         public bool Taskbar = true;       // Clawds em cima da barra de tarefas (fora da Home)
+        public string Lang = "auto";      // idioma da interface: auto, pt ou en
         public bool CheckUpdates = true;  // procurar versão nova no GitHub
         public string SkipVersion = "";   // versão que a pessoa mandou ignorar
         public NotifyCfg Notify = new NotifyCfg();
@@ -657,8 +690,8 @@ namespace ClawdDesktop
         public static Cfg Sample()
         {
             var c = new Cfg();
-            c.Accounts.Add(new AccountCfg { Key = "trabalho", Profile = "Default", Name = "Trabalho", Emails = "empresa.com", ThemeOn = true, Accent = "#3f7fe0", Surface = "#3f7fe0", Warning = "#d9a21b", Pro = "#8a5cf6", Body = "#3f7fe0", Detail = "#ffd23f" });
-            c.Accounts.Add(new AccountCfg { Key = "pessoal", Profile = "Conta 2", Name = "Pessoal", Emails = "*", ThemeOn = true, Accent = "#8b30e6", Surface = "#8b30e6", Pro = "#d03fe0", Body = "#8b30e6", Detail = "#ff7eb6", Skin = "gato" });
+            c.Accounts.Add(new AccountCfg { Key = "trabalho", Profile = "Default", Name = L.T("Trabalho", "Work"), Emails = "empresa.com", ThemeOn = true, Accent = "#3f7fe0", Surface = "#3f7fe0", Warning = "#d9a21b", Pro = "#8a5cf6", Body = "#3f7fe0", Detail = "#ffd23f" });
+            c.Accounts.Add(new AccountCfg { Key = "pessoal", Profile = "Conta 2", Name = L.T("Pessoal", "Personal"), Emails = "*", ThemeOn = true, Accent = "#8b30e6", Surface = "#8b30e6", Pro = "#d03fe0", Body = "#8b30e6", Detail = "#ff7eb6", Skin = "gato" });
             return c;
         }
 
@@ -679,6 +712,7 @@ namespace ClawdDesktop
                 c.Corner = Json.Str(d, "canto", "direito") == "esquerdo" ? "esquerdo" : "direito";
                 c.Events = Json.Bool(d, "eventos", true);
                 c.Taskbar = Json.Bool(d, "barra", true);
+                c.Lang = Json.Str(d, "idioma", "auto");
                 c.Notify = NotifyCfg.FromDict(Json.Obj(d, "avisos"));
                 var up = Json.Obj(d, "atualizacoes");
                 c.CheckUpdates = Json.Bool(up, "procurar", true);
@@ -712,6 +746,8 @@ namespace ClawdDesktop
             d["canto"] = Corner;
             d["eventos"] = Events;
             d["barra"] = Taskbar;
+            d["idioma"] = Lang;
+            d["idiomaAtual"] = L.Code;   // o que o mod usa: o idioma já resolvido
             d["avisos"] = Notify.ToDict();
             var up = new Dictionary<string, object>();
             up["procurar"] = CheckUpdates;

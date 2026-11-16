@@ -11,7 +11,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     static class Ui
     {
@@ -283,19 +283,19 @@ namespace ClawdDesktop
 
         public static string StateName(SessionView s, double now)
         {
-            if (!s.IsActive(now)) return s.EndedAt > 0 ? "encerrada" : "parada";
+            if (!s.IsActive(now)) return s.EndedAt > 0 ? L.T("encerrada", "ended") : L.T("parada", "idle");
             switch (s.State)
             {
-                case "trabalhando": return "trabalhando";
-                case "pensando": return "pensando";
-                case "compactando": return "resumindo";
-                case "aguardando": return "esperando você";
-                case "feito": return "terminou";
-                case "erro": return "erro";
-                case "recusa": return "recusou";
-                case "interrompido": return "interrompida";
-                case "dormindo": return "dormindo";
-                default: return "livre";
+                case "trabalhando": return L.T("trabalhando", "working");
+                case "pensando": return L.T("pensando", "thinking");
+                case "compactando": return L.T("resumindo", "compacting");
+                case "aguardando": return L.T("esperando você", "waiting for you");
+                case "feito": return L.T("terminou", "done");
+                case "erro": return L.T("erro", "error");
+                case "recusa": return L.T("recusou", "refused");
+                case "interrompido": return L.T("interrompida", "interrupted");
+                case "dormindo": return L.T("dormindo", "asleep");
+                default: return L.T("livre", "free");
             }
         }
 
@@ -371,7 +371,7 @@ namespace ClawdDesktop
             };
             tb.KeyDown += delegate(object s, KeyEventArgs e) { if (e.Key == Key.Enter) { e.Handled = true; apply(); } };
             row.Children.Add(tb);
-            var more = Button("Mais…", null, delegate
+            var more = Button(L.T("Mais…", "More…"), null, delegate
             {
                 pop.IsOpen = false;
                 var dlg = new System.Windows.Forms.ColorDialog();
@@ -381,7 +381,7 @@ namespace ClawdDesktop
                 if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK) set(Tint.Hex(Color.FromRgb(dlg.Color.R, dlg.Color.G, dlg.Color.B)));
             });
             more.Margin = new Thickness(0);
-            more.ToolTip = "Abre o seletor de cores do Windows.";
+            more.ToolTip = L.T("Abre o seletor de cores do Windows.", "Opens the Windows color picker.");
             DockPanel.SetDock(more, Dock.Right);
             row.Children.Add(more);
             var ok = Button("OK", null, apply);

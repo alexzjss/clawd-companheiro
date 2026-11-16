@@ -9,13 +9,13 @@ import { PASSING, RELAY_BACKOFF_MS, gistHeaders, relayDue, relayFile, relayFrom,
 import type { Relay } from './relay'
 import type { ContaTema } from './themes'
 
-const PLUGIN = 'clawd-companheiro'
+const PLUGIN = 'clawdesk'
 const PANE = 'clawd-sessoes'
 const SCENE = 'clawd'
 
-const activity = atom({ plugin: 'clawd-companheiro', key: 'activity' } as const, { kind: 'ocioso', since: 0 } as Activity)
-const moodAtom = atom({ plugin: 'clawd-companheiro', key: 'mood' } as const, 'tranquilo' as Mood)
-const sessions = atom({ plugin: 'clawd-companheiro', key: 'sessions' } as const, [] as SessionInfo[])
+const activity = atom({ plugin: 'clawdesk', key: 'activity' } as const, { kind: 'ocioso', since: 0 } as Activity)
+const moodAtom = atom({ plugin: 'clawdesk', key: 'mood' } as const, 'tranquilo' as Mood)
+const sessions = atom({ plugin: 'clawdesk', key: 'sessions' } as const, [] as SessionInfo[])
 
 // Quanto tempo cada estado passageiro fica na tela, e quando o Clawd pega no sono.
 const SHORT_MS = 9_000
@@ -31,18 +31,49 @@ export type Conta = { chave: string; nome: string; emails: string; tema?: ContaT
 const CONTAS_PADRAO: readonly Conta[] = [{ chave: 'claude', nome: 'Claude', emails: '*', tema: { ativo: false } }]
 const CONFIG_EVERY_TICKS = 2
 
-const STATE_TEXT: Record<ActivityKind, string> = {
-  oi: 'chegou agora',
-  ocioso: 'de bobeira',
-  pensando: 'pensando',
-  trabalhando: 'trabalhando',
-  feito: 'terminou!',
-  erro: 'algo deu errado',
-  dormindo: 'dormindo',
-  aguardando: 'esperando você',
-  compactando: 'resumindo a conversa',
-  interrompido: 'foi interrompido',
-  recusa: 'recusou o pedido',
+// O idioma do que o mod escreve: o mesmo do app (o Clawdesk grava "idiomaAtual" na config);
+// sem config, o do sistema (LANG); sem nada, português.
+export type Lang = 'pt' | 'en'
+
+export function langFrom(config: unknown, env: string | undefined): Lang {
+  if (config === 'pt' || config === 'en') return config
+  if (env === undefined || env.trim() === '') return 'pt'
+
+  return /^pt/i.test(env.trim()) ? 'pt' : 'en'
+}
+
+const STATE_TEXT: Record<Lang, Record<ActivityKind, string>> = {
+  pt: {
+    oi: 'chegou agora',
+    ocioso: 'de bobeira',
+    pensando: 'pensando',
+    trabalhando: 'trabalhando',
+    feito: 'terminou!',
+    erro: 'algo deu errado',
+    dormindo: 'dormindo',
+    aguardando: 'esperando você',
+    compactando: 'resumindo a conversa',
+    interrompido: 'foi interrompido',
+    recusa: 'recusou o pedido',
+  },
+  en: {
+    oi: 'just arrived',
+    ocioso: 'hanging out',
+    pensando: 'thinking',
+    trabalhando: 'working',
+    feito: 'done!',
+    erro: 'something went wrong',
+    dormindo: 'asleep',
+    aguardando: 'waiting for you',
+    compactando: 'compacting the conversation',
+    interrompido: 'was interrupted',
+    recusa: 'refused the request',
+  },
+}
+
+const MOOD_TEXT: Record<Lang, Record<Mood, string>> = {
+  pt: { feliz: 'feliz', tranquilo: 'tranquilo', triste: 'triste', sonolento: 'sonolento' },
+  en: { feliz: 'happy', tranquilo: 'calm', triste: 'sad', sonolento: 'sleepy' },
 }
 
 // Ferramentas que param e esperam a pessoa responder.
@@ -90,7 +121,10 @@ export function detailFor(tool: string, input: Record<string, unknown>): string 
   return undefined
 }
 
-const PETS = ['Hehe!', 'Obrigado!', 'Que carinho bom', 'De novo!', '♥', 'Tô feliz!']
+const PETS: Record<Lang, readonly string[]> = {
+  pt: ['Hehe!', 'Obrigado!', 'Que carinho bom', 'De novo!', '♥', 'Tô feliz!'],
+  en: ['Hehe!', 'Thank you!', 'That feels nice', 'Again!', '♥', "I'm happy!"],
+}
 
 // A conta de um e-mail. Cada conta lista domínios (empresa.com vale para ti.empresa.com também) ou
 // e-mails inteiros; a que tiver "*" fica com todos os outros.
@@ -119,6 +153,11 @@ function isConta(v: unknown): v is Conta {
   return typeof c === 'object' && c !== null && typeof c.chave === 'string' && typeof c.nome === 'string' && typeof c.emails === 'string'
 }
 
+// O texto no idioma da sessão.
+function tx(pt: string, en: string): string {
+  return st.lang === 'en' ? en : pt
+}
+
 function accentOf(account: Account): string {
   const main = st.contas.find(c => c.chave === account)?.tema?.principal
 
@@ -137,14 +176,17 @@ export function moodOf(m: Memory, now: number, hour: number): Mood {
   return 'tranquilo'
 }
 
-export function greetingFor(m: Memory, now: number, hour: number): string {
-  if (m.sessions === 0) return 'Oi! Eu sou o Clawd. Vou ficar por aqui com você.'
+export function greetingFor(m: Memory, now: number, hour: number, lang: Lang = 'pt'): string {
+  const en = lang === 'en'
+  if (m.sessions === 0) return en ? "Hi! I'm Clawd. I'll stick around with you." : 'Oi! Eu sou o Clawd. Vou ficar por aqui com você.'
   const days = Math.floor((now - m.lastSeen) / 86_400_000)
-  if (days >= 2) return `Quanto tempo! ${days} dias sem te ver.`
-  if (m.lastFailAt > 0 && now - m.lastFailAt < 60 * 60_000) return 'Bora de novo? Dessa vez vai!'
-  const hi = hour < 12 && hour >= 5 ? 'Bom dia!' : hour < 18 && hour >= 12 ? 'Boa tarde!' : 'Boa noite!'
+  if (days >= 2) return en ? `Long time no see! ${days} days.` : `Quanto tempo! ${days} dias sem te ver.`
+  if (m.lastFailAt > 0 && now - m.lastFailAt < 60 * 60_000) return en ? "Try again? This time it'll work!" : 'Bora de novo? Dessa vez vai!'
+  const morning = hour < 12 && hour >= 5, afternoon = hour < 18 && hour >= 12
+  const hi = en ? (morning ? 'Good morning!' : afternoon ? 'Good afternoon!' : 'Good evening!') : morning ? 'Bom dia!' : afternoon ? 'Boa tarde!' : 'Boa noite!'
+  if (m.tasksDone <= 0) return hi
 
-  return m.tasksDone > 0 ? `${hi} Já são ${m.tasksDone} tarefas juntos.` : hi
+  return en ? `${hi} ${m.tasksDone} tasks together so far.` : `${hi} Já são ${m.tasksDone} tarefas juntos.`
 }
 
 // A animação de cada estado; ocioso depende do humor.
@@ -250,6 +292,7 @@ const st = {
   contas: CONTAS_PADRAO,
   themeKey: '',
   ticks: 0,
+  lang: 'pt' as Lang,
   tools: {} as Record<string, number>,
   busyMs: 0,
   done: 0,
@@ -454,9 +497,10 @@ async function hasDesktop($: E): Promise<boolean> {
 async function loadConfig($: E) {
   if (st.dir === '') return
   try {
-    const raw = JSON.parse(String(await $.fs.read(`${st.dir}/config.json`))) as { contas?: unknown }
+    const raw = JSON.parse(String(await $.fs.read(`${st.dir}/config.json`))) as { contas?: unknown; idiomaAtual?: unknown }
     const list = Array.isArray(raw.contas) ? raw.contas.filter(isConta) : []
     if (list.length > 0) st.contas = list
+    if (raw.idiomaAtual === 'pt' || raw.idiomaAtual === 'en') st.lang = raw.idiomaAtual
   } catch {
     // sem config, ou sendo gravada agora: fica como está
   }
@@ -499,7 +543,8 @@ async function tick($: E) {
 async function pet($: E) {
   st.memory = { ...st.memory, pets: st.memory.pets + 1 }
   await saveMemory($)
-  const line = PETS[st.memory.pets % PETS.length]
+  const pets = PETS[st.lang]
+  const line = pets[st.memory.pets % pets.length]
   await setActivity($, { kind: 'oi', since: await $.clock.now(), ...(line ? { line } : {}) })
 }
 
@@ -560,7 +605,7 @@ export const register: Register = on => {
     turnActive: false, lastWrite: 0, dir: '', memory: emptyMemory(0), ended: false,
     turns: 0, turnStartedAt: 0, costUsd: undefined, contextPercent: undefined,
     agents: {}, lastAgents: 0, model: '', contas: CONTAS_PADRAO, themeKey: '', ticks: 0,
-    tools: {}, busyMs: 0, done: 0, failed: 0,
+    lang: 'pt', tools: {}, busyMs: 0, done: 0, failed: 0,
     email: '', relay: undefined, relayInfo: undefined, relayHold: undefined, relayLast: 0, relayKey: '',
     relayBusy: false, relayPruned: false,
   })
@@ -576,7 +621,8 @@ export const register: Register = on => {
     const now = await $.clock.now()
     st.sessionId = await $.session.id()
     st.cwd = e.cwd
-    st.label = st.cwd.split(/[\\/]/).filter(Boolean).pop() ?? 'sessão'
+    st.lang = langFrom(undefined, (await $.env.get('LC_ALL')) ?? (await $.env.get('LANG')))
+    st.label = st.cwd.split(/[\\/]/).filter(Boolean).pop() ?? tx('sessão', 'session')
     st.startedAt = now
     st.lastActive = now
     // No Windows a pasta é a que o ClawdDesktop lê; fora dele (nuvem, Mac, Linux) ela serve
@@ -605,7 +651,7 @@ export const register: Register = on => {
         st.memory = emptyMemory(now)
       }
     }
-    const hello = greetingFor(st.memory, now, localHour(now))
+    const hello = greetingFor(st.memory, now, localHour(now), st.lang)
     st.memory = { ...st.memory, sessions: st.memory.sessions + 1, lastSeen: now }
     await saveMemory($)
 
@@ -617,7 +663,7 @@ export const register: Register = on => {
     await writeSession($, true)
     await refreshSessions($)
 
-    await $.command.register({ name: 'clawd', description: 'Abre o painel dos Clawds de cada sessão' })
+    await $.command.register({ name: 'clawd', description: tx('Abre o painel dos Clawds de cada sessão', 'Opens the panel with the Clawd of each session') })
     void $.ui.open({ id: PANE, title: 'Clawds' })
     $.clock.every(4_000, () => tick($))
 
@@ -627,7 +673,7 @@ export const register: Register = on => {
   on('command.run', { command: 'clawd' }, async $ => {
     await $.ui.open({ id: PANE, title: 'Clawds' })
 
-    return { text: 'Painel dos Clawds aberto.' }
+    return { text: tx('Painel dos Clawds aberto.', 'Clawds panel opened.') }
   })
 
   // O Clawd nunca segura a mensagem nem a ferramenta: falhas dele só são ignoradas.
@@ -695,17 +741,17 @@ export const register: Register = on => {
       const base = st.memory.today === today ? st.memory : { ...st.memory, today, tasksToday: 0 }
       if (e.reason === 'answer') {
         st.memory = { ...base, tasksDone: base.tasksDone + 1, tasksToday: base.tasksToday + 1, streak: base.streak + 1, lastSeen: now }
-        const line = st.memory.streak > 0 && st.memory.streak % 5 === 0 ? `${st.memory.streak} seguidas! Mandou bem.` : undefined
+        const line = st.memory.streak > 0 && st.memory.streak % 5 === 0 ? tx(`${st.memory.streak} seguidas! Mandou bem.`, `${st.memory.streak} in a row! Nice work.`) : undefined
         await setActivity($, { kind: 'feito', since: now, ...(line ? { line } : {}) })
       } else if (e.reason === 'aborted') {
         st.memory = { ...base, lastSeen: now }
-        await setActivity($, { kind: 'interrompido', since: now, line: 'Opa, parei!' })
+        await setActivity($, { kind: 'interrompido', since: now, line: tx('Opa, parei!', 'Whoa, stopped!') })
       } else if (e.reason === 'refusal') {
         st.memory = { ...base, lastSeen: now }
-        await setActivity($, { kind: 'recusa', since: now, line: 'Esse eu não faço.' })
+        await setActivity($, { kind: 'recusa', since: now, line: tx('Esse eu não faço.', "I won't do that one.") })
       } else {
         st.memory = { ...base, failures: base.failures + 1, streak: 0, lastFailAt: now, lastSeen: now }
-        await setActivity($, { kind: 'erro', since: now, line: 'Ops… vamos ver o que houve.' })
+        await setActivity($, { kind: 'erro', since: now, line: tx('Ops… vamos ver o que houve.', "Oops… let's see what happened.") })
       }
       await saveMemory($)
       await refreshMood($)
@@ -747,7 +793,7 @@ export const register: Register = on => {
     const a = await read($, activity)
     const mood = await read($, moodAtom)
 
-    return <Svg source={sceneSvg(a, mood, st.account)} alt={`Clawd ${STATE_TEXT[a.kind]}`} isInteractive />
+    return <Svg source={sceneSvg(a, mood, st.account)} alt={`Clawd ${STATE_TEXT[st.lang][a.kind]}`} isInteractive />
   })
 
   // O painel: um mini Clawd por sessão (ativas primeiro, as paradas dormindo).
@@ -762,13 +808,16 @@ export const register: Register = on => {
 
     const header = (
       <Box flexDirection="column" marginBottom={1}>
-        <Text bold>Clawd está {mood}</Text>
+        <Text bold>{tx(`Clawd está ${MOOD_TEXT.pt[mood]}`, `Clawd is ${MOOD_TEXT.en[mood]}`)}</Text>
         <Text dimColor>
-          {st.memory.tasksDone} tarefas juntos · {st.memory.tasksToday} hoje · {st.memory.pets} carinhos
+          {tx(
+            `${st.memory.tasksDone} tarefas juntos · ${st.memory.tasksToday} hoje · ${st.memory.pets} carinhos`,
+            `${st.memory.tasksDone} tasks together · ${st.memory.tasksToday} today · ${st.memory.pets} pets`,
+          )}
         </Text>
         <Button
           key="pet"
-          label="Fazer carinho"
+          label={tx('Fazer carinho', 'Pet')}
           onPress={() => pet($)}
         />
       </Box>
@@ -784,7 +833,7 @@ export const register: Register = on => {
       return (
         <Box key={s.id} flexDirection="row" alignItems="center" marginBottom={1}>
           {svgOk && Svg ? (
-            <Svg source={clawdSvg(name, PALETTES.laranja, { id: `p${i}` })} alt={`Clawd ${STATE_TEXT[shown.kind]}`} width={44} height={36} />
+            <Svg source={clawdSvg(name, PALETTES.laranja, { id: `p${i}` })} alt={`Clawd ${STATE_TEXT[st.lang][shown.kind]}`} width={44} height={36} />
           ) : (
             <Text>{active ? '●' : '○'} </Text>
           )}
@@ -794,7 +843,7 @@ export const register: Register = on => {
               {s.label}
             </Text>
             <Text dimColor>
-              {nameOf(s.account)} · {active ? STATE_TEXT[s.state] : minutes < 60 ? `parado há ${minutes} min` : 'dormindo'}
+              {nameOf(s.account)} · {active ? STATE_TEXT[st.lang][s.state] : minutes < 60 ? tx(`parado há ${minutes} min`, `idle for ${minutes} min`) : tx('dormindo', 'asleep')}
             </Text>
           </Box>
         </Box>
@@ -804,7 +853,7 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
         {header}
-        {rows.length === 0 ? <Text dimColor>Nenhuma sessão ainda.</Text> : rows}
+        {rows.length === 0 ? <Text dimColor>{tx('Nenhuma sessão ainda.', 'No sessions yet.')}</Text> : rows}
       </Box>
     )
   })

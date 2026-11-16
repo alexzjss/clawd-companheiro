@@ -1,9 +1,10 @@
 // O que o app e o instalador usam igual: onde as coisas ficam, os atalhos do Windows e o
 // mod do Claude Code (achar o `claude`, ver se o mod está instalado, instalar ou atualizar).
-// Só System: o instalador compila este arquivo junto com o ClawdSetup.cs.
+// Só System: o instalador compila este arquivo junto com o ClawdeskSetup.cs.
 
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -11,15 +12,60 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
+    // O idioma da interface: português ou inglês. "auto" segue o idioma do Windows (português
+    // se ele estiver em português, inglês em qualquer outro caso). Vale para o processo todo:
+    // trocar nas Configurações reinicia o app.
+    static class L
+    {
+        static string choice = "auto";
+        static bool? en;
+
+        public static string Choice
+        {
+            get { return choice; }
+            set { choice = value == "pt" || value == "en" ? value : "auto"; en = null; }
+        }
+
+        public static bool En
+        {
+            get
+            {
+                if (!en.HasValue) en = choice == "en" || (choice == "auto" && CultureInfo.CurrentUICulture.TwoLetterISOLanguageName != "pt");
+                return en.Value;
+            }
+        }
+
+        // O código que o mod lê para falar a mesma língua: "pt" ou "en".
+        public static string Code { get { return En ? "en" : "pt"; } }
+
+        public static string T(string pt, string en) { return En ? en : pt; }
+
+        public static CultureInfo Culture { get { return CultureInfo.GetCultureInfo(En ? "en-US" : "pt-BR"); } }
+
+        // Lê só a escolha do config.json, sem carregar o resto (o instalador também usa).
+        public static void LoadChoice()
+        {
+            try
+            {
+                string path = Path.Combine(AppPaths.DataDir, "config.json");
+                if (!File.Exists(path)) return;
+                var m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(path), "\"idioma\"\\s*:\\s*\"(auto|pt|en)\"");
+                if (m.Success) Choice = m.Groups[1].Value;
+            }
+            catch { }
+        }
+    }
+
     static class AppPaths
     {
-        public const string Name = "Clawd Companheiro";
-        public const string Repo = "alexzjss/clawd-companheiro";
-        public const string Exe = "Clawd.exe";
-        // os programas de antes da 1.2, que o app único substituiu
-        public static readonly string[] OldExes = { "ClawdDesktop.exe", "ClawdCentral.exe" };
+        public const string Name = "Clawdesk";
+        public const string Repo = "alexzjss/clawdesk";
+        public const string Exe = "Clawdesk.exe";
+        // os programas de antes: os da 1.1 (Clawds e Central) e o Clawd.exe do Clawd Companheiro 1.2
+        public static readonly string[] OldExes = { "ClawdDesktop.exe", "ClawdCentral.exe", "Clawd.exe", "ClawdSetup.exe" };
+        public static readonly string[] OldProcesses = { "Clawd", "ClawdDesktop", "ClawdCentral" };
 
         static string Profile { get { return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); } }
         public static string DataDir { get { return Path.Combine(Profile, ".claude", "clawd"); } }
@@ -28,8 +74,12 @@ namespace ClawdDesktop
         public static string MenuLnk { get { return Path.Combine(Menu, Name + ".lnk"); } }
         public static string StartupLnk { get { return Path.Combine(Menu, "Startup", Name + ".lnk"); } }
         public static string DesktopLnk { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Name + ".lnk"); } }
-        // atalhos de antes da 1.2
-        public static readonly string[] OldLnks = { "Clawd.lnk", "Central dos Clawds.lnk", Path.Combine("Startup", "Clawd.lnk") };
+        // atalhos de antes, quando o app se chamava Clawd Companheiro
+        public static readonly string[] OldLnks =
+        {
+            "Clawd.lnk", "Central dos Clawds.lnk", Path.Combine("Startup", "Clawd.lnk"),
+            "Clawd Companheiro.lnk", Path.Combine("Startup", "Clawd Companheiro.lnk"),
+        };
 
         public static string Version
         {
@@ -40,7 +90,10 @@ namespace ClawdDesktop
             }
         }
 
-        public static bool StartsWithWindows { get { return File.Exists(StartupLnk) || File.Exists(Path.Combine(Menu, "Startup", "Clawd.lnk")); } }
+        public static bool StartsWithWindows
+        {
+            get { return File.Exists(StartupLnk) || File.Exists(Path.Combine(Menu, "Startup", "Clawd.lnk")) || File.Exists(Path.Combine(Menu, "Startup", "Clawd Companheiro.lnk")); }
+        }
 
         public static void Shortcut(string lnk, string target, string args, string text)
         {
@@ -58,9 +111,12 @@ namespace ClawdDesktop
         // Liga ou desliga a abertura junto com o Windows (em segundo plano, sem janela).
         public static void SetStartup(bool on, string exe)
         {
-            string old = Path.Combine(Menu, "Startup", "Clawd.lnk");
-            if (File.Exists(old)) File.Delete(old);
-            if (on) Shortcut(StartupLnk, exe, "--fundo", "Os Clawds e os avisos das sessões do Claude");
+            foreach (string name in new[] { "Clawd.lnk", "Clawd Companheiro.lnk" })
+            {
+                string old = Path.Combine(Menu, "Startup", name);
+                if (File.Exists(old)) File.Delete(old);
+            }
+            if (on) Shortcut(StartupLnk, exe, "--fundo", L.T("Os Clawds e os avisos das sessões do Claude", "Clawds and notifications for your Claude sessions"));
             else if (File.Exists(StartupLnk)) File.Delete(StartupLnk);
         }
     }
@@ -69,6 +125,7 @@ namespace ClawdDesktop
     {
         public string Claude;      // caminho do claude, ou null se não achou
         public bool Installed;
+        public bool Legacy;        // o mod com o nome antigo (clawd-companheiro) ainda está lá
         public string Version = "";
         public string Error;
     }
@@ -76,9 +133,11 @@ namespace ClawdDesktop
     // O mod do Claude Code, pelo comando `claude plugin`.
     static class ModTool
     {
-        public const string Plugin = "clawd-companheiro";
-        public const string Market = "clawd-companheiro";
-        public const string ManualLine = "/plugin install clawd-companheiro --marketplace alexzjss/clawd-companheiro";
+        public const string Plugin = "clawdesk";
+        public const string Market = "clawdesk";
+        // o nome do mod e do marketplace antes de o app virar Clawdesk
+        public const string OldPlugin = "clawd-companheiro";
+        public const string ManualLine = "/plugin install clawdesk --marketplace alexzjss/clawdesk";
 
         // Onde o instalador do Claude Code costuma deixar o `claude`.
         public static string FindClaude()
@@ -136,7 +195,7 @@ namespace ClawdDesktop
                 if (!p.WaitForExit(timeoutMs))
                 {
                     try { p.Kill(); } catch { }
-                    lock (sb) output = sb.ToString() + "\n(o claude demorou demais e foi parado)";
+                    lock (sb) output = sb.ToString() + L.T("\n(o claude demorou demais e foi parado)", "\n(claude took too long and was stopped)");
                     return -1;
                 }
                 p.WaitForExit();
@@ -156,6 +215,7 @@ namespace ClawdDesktop
                 int code = Run(st.Claude, "plugin list --json", 60000, out text);
                 if (code != 0) { st.Error = Last(text); return st; }
                 st.Installed = text.IndexOf("\"" + Plugin, StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf(Plugin + "@", StringComparison.OrdinalIgnoreCase) >= 0;
+                st.Legacy = text.IndexOf(OldPlugin, StringComparison.OrdinalIgnoreCase) >= 0;
                 var m = Regex.Match(text, Regex.Escape(Plugin) + "[^{}]*?\"version\"\\s*:\\s*\"([^\"]+)\"", RegexOptions.Singleline);
                 if (m.Success) st.Version = m.Groups[1].Value;
             }
@@ -163,10 +223,11 @@ namespace ClawdDesktop
             return st;
         }
 
-        // Instala o mod (ou atualiza, se já tiver). Devolve null se deu certo, ou o erro.
+        // Instala o mod (ou atualiza, se já tiver) e tira o de nome antigo, se houver.
+        // Devolve null se deu certo, ou o erro.
         public static string InstallOrUpdate(ModStatus st)
         {
-            if (st == null || st.Claude == null) return "Não achei o Claude Code (o comando claude) neste computador.";
+            if (st == null || st.Claude == null) return L.T("Não achei o Claude Code (o comando claude) neste computador.", "Claude Code (the claude command) was not found on this computer.");
             string text;
             int code;
             if (st.Installed)
@@ -175,13 +236,20 @@ namespace ClawdDesktop
                 code = Run(st.Claude, "plugin update " + Plugin + "@" + Market, 180000, out text);
             }
             else code = Run(st.Claude, "plugin install " + Plugin + " --marketplace " + AppPaths.Repo + " -y", 180000, out text);
-            return code == 0 ? null : Last(text);
+            if (code != 0) return Last(text);
+            if (st.Legacy)
+            {
+                // o mod de antes do Clawdesk: sai, para não rodarem os dois
+                Run(st.Claude, "plugin uninstall " + OldPlugin + "@" + OldPlugin, 120000, out text);
+                Run(st.Claude, "plugin marketplace remove " + OldPlugin, 60000, out text);
+            }
+            return null;
         }
 
         static string Last(string text)
         {
             var lines = (text ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
-            return lines.Count == 0 ? "o claude terminou com erro, sem mensagem" : string.Join(" ", lines.Skip(Math.Max(0, lines.Count - 3)).ToArray());
+            return lines.Count == 0 ? L.T("o claude terminou com erro, sem mensagem", "claude exited with an error and no message") : string.Join(" ", lines.Skip(Math.Max(0, lines.Count - 3)).ToArray());
         }
     }
 }

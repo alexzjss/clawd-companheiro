@@ -10,7 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     sealed class HomePage : Grid
     {
@@ -65,10 +65,10 @@ namespace ClawdDesktop
             int waiting = all.Count(s => s.IsActive(now) && s.State == "aguardando");
             int active = all.Count(s => s.IsActive(now));
             var bits = new List<string>();
-            if (waiting > 0) bits.Add(waiting + " esperando você");
-            if (working > 0) bits.Add(working + " trabalhando");
-            if (active == 0) bits.Add("ninguém trabalhando agora: abra o Claude e comece uma conversa");
-            else bits.Add(active == 1 ? "1 sessão ativa" : active + " sessões ativas");
+            if (waiting > 0) bits.Add(waiting + L.T(" esperando você", " waiting for you"));
+            if (working > 0) bits.Add(working + L.T(" trabalhando", " working"));
+            if (active == 0) bits.Add(L.T("ninguém trabalhando agora: abra o Claude e comece uma conversa", "nobody working right now: open Claude and start a conversation"));
+            else bits.Add(active == 1 ? L.T("1 sessão ativa", "1 active session") : active + L.T(" sessões ativas", " active sessions"));
             summary.Text = string.Join("  ·  ", bits.ToArray());
             BuildDetail();
         }
@@ -110,14 +110,14 @@ namespace ClawdDesktop
             var top = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
             var close = Ui.Icon(Ui.IcClose, 11, Ui.Dim);
             close.Cursor = Cursors.Hand;
-            close.ToolTip = "Fechar";
+            close.ToolTip = L.T("Fechar", "Close");
             close.MouseLeftButtonUp += delegate { Office.Select(null); };
             DockPanel.SetDock(close, Dock.Right);
             top.Children.Add(close);
             var dot = Ui.Dot(acc != null ? Pal.B(acc.Body, 1) : Ui.Off, 9);
             dot.Margin = new Thickness(0, 1, 8, 0);
             top.Children.Add(dot);
-            top.Children.Add(Ui.T(acc != null ? acc.Name : "Visitante", 12.5, Ui.Dim, false));
+            top.Children.Add(Ui.T(acc != null ? acc.Name : L.T("Visitante", "Visitor"), 12.5, Ui.Dim, false));
             detailBody.Children.Add(top);
 
             detailBody.Children.Add(Ui.T(s.Label, 16, Ui.Text, true));
@@ -129,20 +129,20 @@ namespace ClawdDesktop
             what.Margin = new Thickness(0, 0, 0, 12);
             detailBody.Children.Add(what);
 
-            if (s.IsRemote) Row("Onde", s.Origin == "nuvem" ? "na nuvem do claude.ai" : "em outro computador");
+            if (s.IsRemote) Row(L.T("Onde", "Where"), s.Origin == "nuvem" ? L.T("na nuvem do claude.ai", "in the claude.ai cloud") : L.T("em outro computador", "on another computer"));
             string model = Ui.ModelName(s.Model);
-            if (model.Length > 0) Row("Modelo", model);
-            if (s.Agents > 0) Row("Subagentes", ((int)s.Agents).ToString());
-            if (s.Turns > 0) Row("Turnos", ((int)s.Turns).ToString());
-            if (!double.IsNaN(s.Cost)) Row("Custo", Words.Money(s.Cost));
-            if (s.StartedAt > 0) Row("Aberta", Words.Ago(now - s.StartedAt));
+            if (model.Length > 0) Row(L.T("Modelo", "Model"), model);
+            if (s.Agents > 0) Row(L.T("Subagentes", "Subagents"), ((int)s.Agents).ToString());
+            if (s.Turns > 0) Row(L.T("Turnos", "Turns"), ((int)s.Turns).ToString());
+            if (!double.IsNaN(s.Cost)) Row(L.T("Custo", "Cost"), Words.Money(s.Cost));
+            if (s.StartedAt > 0) Row(L.T("Aberta", "Opened"), Words.Ago(now - s.StartedAt));
             if (!double.IsNaN(s.Ctx) && s.IsActive(now))
             {
                 var g = new Grid { Margin = new Thickness(0, 2, 0, 6) };
                 g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
                 g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                g.Children.Add(Ui.T("Contexto", 12, Ui.Faint, false));
+                g.Children.Add(Ui.T(L.T("Contexto", "Context"), 12, Ui.Faint, false));
                 var bar = Ui.Bar(s.Ctx, s.Ctx >= 85 ? Ui.Bad : s.Ctx >= 65 ? Ui.Warn : Pal.B(acc != null ? acc.Body : Ui.Accent, 1), 6);
                 Grid.SetColumn(bar, 1);
                 g.Children.Add(bar);
@@ -154,7 +154,7 @@ namespace ClawdDesktop
             }
             if (acc != null)
             {
-                var open = Ui.Button(Ui.IcOpen, "Abrir o Claude " + acc.Name, acc.Accent, delegate { Open(acc); });
+                var open = Ui.Button(Ui.IcOpen, L.T("Abrir o Claude ", "Open Claude ") + acc.Name, acc.Accent, delegate { Open(acc); });
                 open.Margin = new Thickness(0, 12, 0, 0);
                 detailBody.Children.Add(open);
             }

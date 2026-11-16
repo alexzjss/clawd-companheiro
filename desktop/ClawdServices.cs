@@ -15,7 +15,7 @@ using System.Web.Script.Serialization;
 using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     // ------------------------------------------------------------- bandeja --
 
@@ -34,21 +34,21 @@ namespace ClawdDesktop
             catch { icon.Icon = System.Drawing.SystemIcons.Application; }
             icon.Text = AppPaths.Name;
             var menu = new Forms.ContextMenuStrip();
-            var open = new Forms.ToolStripMenuItem("Abrir a Home", null, delegate { Fire("home"); });
+            var open = new Forms.ToolStripMenuItem(L.T("Abrir a Home", "Open Home"), null, delegate { Fire("home"); });
             open.Font = new System.Drawing.Font(open.Font, System.Drawing.FontStyle.Bold);
             menu.Items.Add(open);
-            menu.Items.Add(new Forms.ToolStripMenuItem("Estatísticas", null, delegate { Fire("estatisticas"); }));
-            menu.Items.Add(new Forms.ToolStripMenuItem("Contas", null, delegate { Fire("contas"); }));
-            menu.Items.Add(new Forms.ToolStripMenuItem("Configurações", null, delegate { Fire("configuracoes"); }));
+            menu.Items.Add(new Forms.ToolStripMenuItem(L.T("Estatísticas", "Statistics"), null, delegate { Fire("estatisticas"); }));
+            menu.Items.Add(new Forms.ToolStripMenuItem(L.T("Contas", "Accounts"), null, delegate { Fire("contas"); }));
+            menu.Items.Add(new Forms.ToolStripMenuItem(L.T("Configurações", "Settings"), null, delegate { Fire("configuracoes"); }));
             menu.Items.Add(new Forms.ToolStripSeparator());
-            taskbar = new Forms.ToolStripMenuItem("Clawds na barra de tarefas", null, delegate { if (ToggleTaskbar != null) ToggleTaskbar(); });
+            taskbar = new Forms.ToolStripMenuItem(L.T("Clawds na barra de tarefas", "Clawds on the taskbar"), null, delegate { if (ToggleTaskbar != null) ToggleTaskbar(); });
             menu.Items.Add(taskbar);
-            quiet = new Forms.ToolStripMenuItem("Não perturbe por 1 hora", null, delegate { if (ToggleQuiet != null) ToggleQuiet(); });
+            quiet = new Forms.ToolStripMenuItem(L.T("Não perturbe por 1 hora", "Do not disturb for 1 hour"), null, delegate { if (ToggleQuiet != null) ToggleQuiet(); });
             menu.Items.Add(quiet);
             menu.Items.Add(new Forms.ToolStripSeparator());
-            update = new Forms.ToolStripMenuItem("Procurar atualizações", null, delegate { if (CheckUpdates != null) CheckUpdates(); });
+            update = new Forms.ToolStripMenuItem(L.T("Procurar atualizações", "Check for updates"), null, delegate { if (CheckUpdates != null) CheckUpdates(); });
             menu.Items.Add(update);
-            menu.Items.Add(new Forms.ToolStripMenuItem("Sair", null, delegate { if (Quit != null) Quit(); }));
+            menu.Items.Add(new Forms.ToolStripMenuItem(L.T("Sair", "Quit"), null, delegate { if (Quit != null) Quit(); }));
             icon.ContextMenuStrip = menu;
             icon.MouseClick += delegate(object s, Forms.MouseEventArgs e) { if (e.Button == Forms.MouseButtons.Left) Fire("home"); };
             icon.BalloonTipClicked += delegate { if (balloonClick != null) balloonClick(); };
@@ -62,9 +62,9 @@ namespace ClawdDesktop
             taskbar.Checked = cfg.Taskbar;
             bool q = cfg.Notify.QuietUntil > Data.NowMs();
             quiet.Checked = q;
-            quiet.Text = q ? "Não perturbe até " + Local(cfg.Notify.QuietUntil).ToString("HH:mm") : "Não perturbe por 1 hora";
-            update.Text = newVersion != null ? "Atualizar para a versão " + newVersion : "Procurar atualizações";
-            icon.Text = newVersion != null ? AppPaths.Name + " (versão " + newVersion + " disponível)" : AppPaths.Name;
+            quiet.Text = q ? L.T("Não perturbe até ", "Do not disturb until ") + Local(cfg.Notify.QuietUntil).ToString("HH:mm") : L.T("Não perturbe por 1 hora", "Do not disturb for 1 hour");
+            update.Text = newVersion != null ? L.T("Atualizar para a versão ", "Update to version ") + newVersion : L.T("Procurar atualizações", "Check for updates");
+            icon.Text = newVersion != null ? AppPaths.Name + L.T(" (versão ", " (version ") + newVersion + L.T(" disponível)", " available)") : AppPaths.Name;
         }
 
         static DateTime Local(double ms) { return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(ms).ToLocalTime(); }
@@ -155,7 +155,7 @@ namespace ClawdDesktop
             string title, text;
             if (shown.Count > 1)
             {
-                title = shown.Count + " sessões precisam de você";
+                title = shown.Count + L.T(" sessões precisam de você", " sessions need you");
                 text = string.Join("\n", shown.Take(4).Select(e => Line(e.Item2) + ": " + e.Item1.Label).ToArray());
             }
             else
@@ -164,16 +164,16 @@ namespace ClawdDesktop
                 switch (first.Item2)
                 {
                     case "feito":
-                        title = "Pronto: " + s.Label;
-                        text = where + " · levou " + Words.Dur(now - s.TurnStartedAt);
+                        title = L.T("Pronto: ", "Done: ") + s.Label;
+                        text = where + L.T(" · levou ", " · took ") + Words.Dur(now - s.TurnStartedAt);
                         break;
                     case "erro":
-                        title = "Deu erro: " + s.Label;
-                        text = where + " · a sessão parou com um erro.";
+                        title = L.T("Deu erro: ", "Error: ") + s.Label;
+                        text = where + L.T(" · a sessão parou com um erro.", " · the session stopped with an error.");
                         break;
                     default:
-                        title = (s.Tool == "AskUserQuestion" ? "Uma pergunta para você: " : s.Tool == "ExitPlanMode" ? "Plano para aprovar: " : "Pedido de permissão: ") + s.Label;
-                        text = where + " está esperando a sua resposta.";
+                        title = (s.Tool == "AskUserQuestion" ? L.T("Uma pergunta para você: ", "A question for you: ") : s.Tool == "ExitPlanMode" ? L.T("Plano para aprovar: ", "Plan to approve: ") : L.T("Pedido de permissão: ", "Permission request: ")) + s.Label;
+                        text = where + L.T(" está esperando a sua resposta.", " is waiting for your answer.");
                         break;
                 }
             }
@@ -186,13 +186,13 @@ namespace ClawdDesktop
 
         static string Line(string kind)
         {
-            return kind == "feito" ? "pronto" : kind == "erro" ? "erro" : "esperando";
+            return kind == "feito" ? L.T("pronto", "done") : kind == "erro" ? L.T("erro", "error") : L.T("esperando", "waiting");
         }
     }
 
     // --------------------------------------------------------- atualização --
 
-    // Procura a última release no GitHub e, se for mais nova, baixa o ClawdSetup.exe, confere
+    // Procura a última release no GitHub e, se for mais nova, baixa o ClawdeskSetup.exe, confere
     // o SHA-256 publicado junto e roda o instalador em modo silencioso.
     sealed class Updater
     {
@@ -229,7 +229,7 @@ namespace ClawdDesktop
         {
             ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;   // TLS 1.2
             var w = new WebClient();
-            w.Headers[HttpRequestHeader.UserAgent] = "ClawdCompanheiro/" + AppPaths.Version;
+            w.Headers[HttpRequestHeader.UserAgent] = "Clawdesk/" + AppPaths.Version;
             w.Encoding = Encoding.UTF8;
             return w;
         }
@@ -248,7 +248,7 @@ namespace ClawdDesktop
         {
             if (Checking || Installing) return;
             Checking = true;
-            Status = "Procurando…";
+            Status = L.T("Procurando…", "Checking…");
             if (Changed != null) Changed();
             ThreadPool.QueueUserWorkItem(delegate
             {
@@ -267,8 +267,8 @@ namespace ClawdDesktop
                     {
                         var a = o as Dictionary<string, object>;
                         string name = Json.Str(a, "name", "");
-                        if (name.Equals("ClawdSetup.exe", StringComparison.OrdinalIgnoreCase)) setup = Json.Str(a, "browser_download_url", null);
-                        if (name.Equals("ClawdSetup.exe.sha256", StringComparison.OrdinalIgnoreCase)) sha = Json.Str(a, "browser_download_url", null);
+                        if (name.Equals("ClawdeskSetup.exe", StringComparison.OrdinalIgnoreCase)) setup = Json.Str(a, "browser_download_url", null);
+                        if (name.Equals("ClawdeskSetup.exe.sha256", StringComparison.OrdinalIgnoreCase)) sha = Json.Str(a, "browser_download_url", null);
                     }
                     string notes = Json.Str(d, "body", "");
                     string page = Json.Str(d, "html_url", "https://github.com/" + AppPaths.Repo + "/releases/latest");
@@ -278,12 +278,12 @@ namespace ClawdDesktop
                         SetupUrl = setup; ShaUrl = sha; Notes = notes; PageUrl = page;
                         LastCheck = DateTime.Now;
                     }));
-                    Done(tag == null ? "Não achei nenhuma versão publicada." : Newer(tag, AppPaths.Version) ? "Versão " + Clean(tag) + " disponível." : "Você já tem a versão mais nova.");
+                    Done(tag == null ? L.T("Não achei nenhuma versão publicada.", "No published version found.") : Newer(tag, AppPaths.Version) ? L.T("Versão ", "Version ") + Clean(tag) + L.T(" disponível.", " available.") : L.T("Você já tem a versão mais nova.", "You already have the latest version."));
                 }
                 catch (Exception e)
                 {
                     Program.Log("atualização: " + e.Message);
-                    Done(manual ? "Não consegui falar com o GitHub: " + e.Message : "");
+                    Done(manual ? L.T("Não consegui falar com o GitHub: ", "Couldn't reach GitHub: ") + e.Message : "");
                 }
             });
         }
@@ -292,16 +292,16 @@ namespace ClawdDesktop
         {
             if (Installing || SetupUrl == null) return;
             Installing = true;
-            Status = "Baixando a versão " + Latest + "…";
+            Status = L.T("Baixando a versão ", "Downloading version ") + Latest + "…";
             if (Changed != null) Changed();
             string url = SetupUrl, shaUrl = ShaUrl, ver = Latest;
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try
                 {
-                    string dir = Path.Combine(Path.GetTempPath(), "ClawdCompanheiro");
+                    string dir = Path.Combine(Path.GetTempPath(), "Clawdesk");
                     Directory.CreateDirectory(dir);
-                    string file = Path.Combine(dir, "ClawdSetup-" + ver + ".exe");
+                    string file = Path.Combine(dir, "ClawdeskSetup-" + ver + ".exe");
                     using (var w = Client()) w.DownloadFile(url, file);
                     if (shaUrl != null)
                     {
@@ -313,11 +313,11 @@ namespace ClawdDesktop
                         if (got != expected)
                         {
                             try { File.Delete(file); } catch { }
-                            throw new InvalidOperationException("o arquivo baixado não bate com o SHA-256 publicado; tente de novo mais tarde.");
+                            throw new InvalidOperationException(L.T("o arquivo baixado não bate com o SHA-256 publicado; tente de novo mais tarde.", "the downloaded file doesn't match the published SHA-256; try again later."));
                         }
                     }
                     Process.Start(new ProcessStartInfo(file, "/quiet /abrir") { UseShellExecute = true });
-                    ui.BeginInvoke(new Action(delegate { Status = "Instalando…"; if (ReadyToQuit != null) ReadyToQuit(); }));
+                    ui.BeginInvoke(new Action(delegate { Status = L.T("Instalando…", "Installing…"); if (ReadyToQuit != null) ReadyToQuit(); }));
                 }
                 catch (Exception e)
                 {
@@ -325,7 +325,7 @@ namespace ClawdDesktop
                     ui.BeginInvoke(new Action(delegate
                     {
                         Installing = false;
-                        Status = "Não consegui atualizar: " + e.Message;
+                        Status = L.T("Não consegui atualizar: ", "Couldn't update: ") + e.Message;
                         if (Changed != null) Changed();
                     }));
                 }

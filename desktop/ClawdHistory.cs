@@ -16,7 +16,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     sealed class AccDay
     {
@@ -369,14 +369,14 @@ namespace ClawdDesktop
 
         static readonly Dictionary<string, string> Category = new Dictionary<string, string>
         {
-            { "bash", "Terminal" }, { "ps", "PowerShell" }, { "git", "Git" }, { "test", "Testes" }, { "install", "Instalar pacotes" },
-            { "build", "Compilar" }, { "trash", "Apagar arquivos" }, { "stack", "Docker e contêineres" }, { "net", "Rede" },
-            { "peek", "Olhar arquivos" }, { "rocket", "Rodar programas" }, { "read", "Ler arquivos" }, { "grep", "Buscar no código" },
-            { "glob", "Achar arquivos" }, { "edit", "Editar arquivos" }, { "paint", "Imagens" }, { "write", "Criar arquivos" },
-            { "grid", "Notebooks" }, { "search", "Pesquisar na web" }, { "fetch", "Abrir páginas" }, { "browser", "Navegador" },
-            { "camera", "Capturas de tela" }, { "mouse", "Usar o computador" }, { "agent", "Subagentes" }, { "conduct", "Workflows" },
-            { "plan", "Plano e tarefas" }, { "spell", "Skills" }, { "toolbox", "Procurar ferramentas" }, { "plug", "Conectores (MCP)" },
-            { "tool", "Outras ferramentas" },
+            { "bash", L.T("Terminal", "Terminal") }, { "ps", "PowerShell" }, { "git", L.T("Git", "Git") }, { "test", L.T("Testes", "Tests") }, { "install", L.T("Instalar pacotes", "Installing packages") },
+            { "build", L.T("Compilar", "Building") }, { "trash", L.T("Apagar arquivos", "Deleting files") }, { "stack", L.T("Docker e contêineres", "Docker and containers") }, { "net", L.T("Rede", "Network") },
+            { "peek", L.T("Olhar arquivos", "Browsing files") }, { "rocket", L.T("Rodar programas", "Running programs") }, { "read", L.T("Ler arquivos", "Reading files") }, { "grep", L.T("Buscar no código", "Searching code") },
+            { "glob", L.T("Achar arquivos", "Finding files") }, { "edit", L.T("Editar arquivos", "Editing files") }, { "paint", L.T("Imagens", "Images") }, { "write", L.T("Criar arquivos", "Creating files") },
+            { "grid", L.T("Notebooks", "Notebooks") }, { "search", L.T("Pesquisar na web", "Web search") }, { "fetch", L.T("Abrir páginas", "Fetching pages") }, { "browser", L.T("Navegador", "Browser") },
+            { "camera", L.T("Capturas de tela", "Screenshots") }, { "mouse", L.T("Usar o computador", "Computer use") }, { "agent", L.T("Subagentes", "Subagents") }, { "conduct", L.T("Workflows", "Workflows") },
+            { "plan", L.T("Plano e tarefas", "Plans and tasks") }, { "spell", L.T("Skills", "Skills") }, { "toolbox", L.T("Procurar ferramentas", "Tool search") }, { "plug", L.T("Conectores (MCP)", "Connectors (MCP)") },
+            { "tool", L.T("Outras ferramentas", "Other tools") },
         };
 
         public static string ToolCategory(string key)
@@ -385,7 +385,7 @@ namespace ClawdDesktop
             string tool = i >= 0 ? key.Substring(0, i) : key, detail = i >= 0 ? key.Substring(i + 1) : "";
             string anim = Words.WorkAnim(tool, detail);
             string name;
-            return Category.TryGetValue(anim, out name) ? name : "Outras ferramentas";
+            return Category.TryGetValue(anim, out name) ? name : L.T("Outras ferramentas", "Other tools");
         }
 
         public static string Hours(double sec)
@@ -398,10 +398,10 @@ namespace ClawdDesktop
 
         static string Pct(double now, double before)
         {
-            if (before <= 0.0001) return now > 0 ? "novo no período" : "";
+            if (before <= 0.0001) return now > 0 ? L.T("novo no período", "new this period") : "";
             double p = (now - before) / before * 100;
-            if (Math.Abs(p) < 1) return "igual ao período anterior";
-            return (p > 0 ? "+" : "−") + Math.Abs(Math.Round(p)) + "% que o período anterior";
+            if (Math.Abs(p) < 1) return L.T("igual ao período anterior", "same as previous period");
+            return (p > 0 ? "+" : "−") + Math.Abs(Math.Round(p)) + L.T("% que o período anterior", "% vs. previous period");
         }
 
         void Build()
@@ -416,10 +416,10 @@ namespace ClawdDesktop
 
             // filtros numa linha, acima de tudo
             var filters = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
-            var seg = Ui.Segmented(new[] { "7 dias", "30 dias", "90 dias" }, range, delegate(int i) { range = i; Build(); });
+            var seg = Ui.Segmented(new[] { L.T("7 dias", "7 days"), L.T("30 dias", "30 days"), L.T("90 dias", "90 days") }, range, delegate(int i) { range = i; Build(); });
             seg.Margin = new Thickness(0, 0, 14, 6);
             filters.Children.Add(seg);
-            filters.Children.Add(Ui.Chip(Ui.T("Todas as contas", 12.5, Ui.Text, false), account == null, Ui.Accent, delegate { account = null; Build(); }));
+            filters.Children.Add(Ui.Chip(Ui.T(L.T("Todas as contas", "All accounts"), 12.5, Ui.Text, false), account == null, Ui.Accent, delegate { account = null; Build(); }));
             foreach (var a0 in c.Accounts)
             {
                 var a = a0;
@@ -434,28 +434,28 @@ namespace ClawdDesktop
 
             if (hist.Empty)
             {
-                sp.Children.Add(Ui.Section("Ainda sem histórico",
-                    "As estatísticas começam a contar a partir de agora: custo, tempo trabalhando, tarefas e ferramentas de cada sessão, por dia e por conta. Use o Claude normalmente e volte aqui mais tarde.", null));
+                sp.Children.Add(Ui.Section(L.T("Ainda sem histórico", "No history yet"),
+                    L.T("As estatísticas começam a contar a partir de agora: custo, tempo trabalhando, tarefas e ferramentas de cada sessão, por dia e por conta. Use o Claude normalmente e volte aqui mais tarde.", "Statistics start counting now: cost, time working, tasks and tools for each session, by day and by account. Use Claude as usual and come back later."), null));
                 Content = sp;
                 return;
             }
 
             // os números do período
             var tiles = new UniformGrid4();
-            tiles.Add(Tile("Custo", Words.Money(cur.Cost), Pct(cur.Cost, prev.Cost)));
-            tiles.Add(Tile("Tempo trabalhando", Hours(cur.BusySec), Pct(cur.BusySec, prev.BusySec)));
-            tiles.Add(Tile("Sessões", cur.Sessions.ToString(), Pct(cur.Sessions, prev.Sessions)));
+            tiles.Add(Tile(L.T("Custo", "Cost"), Words.Money(cur.Cost), Pct(cur.Cost, prev.Cost)));
+            tiles.Add(Tile(L.T("Tempo trabalhando", "Time working"), Hours(cur.BusySec), Pct(cur.BusySec, prev.BusySec)));
+            tiles.Add(Tile(L.T("Sessões", "Sessions"), cur.Sessions.ToString(), Pct(cur.Sessions, prev.Sessions)));
             int total = cur.Done + cur.Failed;
-            tiles.Add(Tile("Tarefas concluídas", cur.Done.ToString(), total > 0 ? Math.Round(100.0 * cur.Done / total) + "% sem erro · " + cur.Failed + (cur.Failed == 1 ? " erro" : " erros") : ""));
+            tiles.Add(Tile(L.T("Tarefas concluídas", "Tasks done"), cur.Done.ToString(), total > 0 ? Math.Round(100.0 * cur.Done / total) + L.T("% sem erro · ", "% without errors · ") + cur.Failed + (cur.Failed == 1 ? L.T(" erro", " error") : L.T(" erros", " errors")) : ""));
             sp.Children.Add(tiles.Panel);
 
             // custo e tempo por dia: dois gráficos, um eixo cada
             var costs = days.Select(d => hist.Sum(new[] { d }, account).Cost).ToList();
             var busy = days.Select(d => hist.Sum(new[] { d }, account).BusySec / 3600).ToList();
-            var labels = days.Select(d => DateTime.ParseExact(d, "yyyy-MM-dd", CultureInfo.InvariantCulture).ToString(n <= 7 ? "ddd dd" : "dd/MM", Words.PtBR)).ToList();
+            var labels = days.Select(d => DateTime.ParseExact(d, "yyyy-MM-dd", CultureInfo.InvariantCulture).ToString(n <= 7 ? "ddd dd" : L.T("dd/MM", "MM/dd"), L.Culture)).ToList();
             string color = account != null ? c.Accounts.First(a => a.Key == account).Body : Ui.Accent;
-            sp.Children.Add(Ui.Section("Custo por dia", null, new BarChart(costs, labels, delegate(double v) { return Words.Money(v); }, color, 160)));
-            sp.Children.Add(Ui.Section("Tempo trabalhando por dia", null, new BarChart(busy, labels, delegate(double v) { return Hours(v * 3600); }, color, 140)));
+            sp.Children.Add(Ui.Section(L.T("Custo por dia", "Cost per day"), null, new BarChart(costs, labels, delegate(double v) { return Words.Money(v); }, color, 160)));
+            sp.Children.Add(Ui.Section(L.T("Tempo trabalhando por dia", "Time working per day"), null, new BarChart(busy, labels, delegate(double v) { return Hours(v * 3600); }, color, 140)));
 
             // ferramentas e horários lado a lado
             var two = new Grid();
@@ -465,18 +465,18 @@ namespace ClawdDesktop
             var tools = cur.Tools.GroupBy(t => ToolCategory(t.Key)).Select(g => new KeyValuePair<string, double>(g.Key, g.Sum(x => x.Value)))
                 .Where(x => x.Value > 0).OrderByDescending(x => x.Value).Take(10).ToList();
             UIElement toolBody = tools.Count == 0
-                ? (UIElement)Ui.T("Ainda sem dados. A contagem de ferramentas vem do mod; atualize-o se ele for de antes da versão 1.2.", 12.5, Ui.Dim, false)
+                ? (UIElement)Ui.T(L.T("Ainda sem dados. A contagem de ferramentas vem do mod; atualize-o se ele for de antes da versão 1.2.", "No data yet. Tool counts come from the mod; update it if it predates version 1.2."), 12.5, Ui.Dim, false)
                 : Ranking(tools, color);
-            var tsec = Ui.Section("Ferramentas mais usadas", "Chamadas no período, por tipo.", toolBody);
+            var tsec = Ui.Section(L.T("Ferramentas mais usadas", "Most used tools"), L.T("Chamadas no período, por tipo.", "Calls in the period, by type."), toolBody);
             two.Children.Add(tsec);
             var hourLabels = Enumerable.Range(0, 24).Select(h => h.ToString("00") + "h").ToList();
-            var hsec = Ui.Section("Horários", "Em que horas do dia o Claude mais trabalhou.", new BarChart(cur.Hours.Select(x => x / 3600).ToList(), hourLabels, delegate(double v) { return Hours(v * 3600); }, color, 150));
+            var hsec = Ui.Section(L.T("Horários", "Hours"), L.T("Em que horas do dia o Claude mais trabalhou.", "When during the day Claude worked the most."), new BarChart(cur.Hours.Select(x => x / 3600).ToList(), hourLabels, delegate(double v) { return Hours(v * 3600); }, color, 150));
             Grid.SetColumn(hsec, 2);
             two.Children.Add(hsec);
             sp.Children.Add(two);
 
             // por conta (também é a versão em tabela dos números)
-            if (account == null && c.Accounts.Count > 0) sp.Children.Add(Ui.Section("Por conta", null, AccountTable(c, days)));
+            if (account == null && c.Accounts.Count > 0) sp.Children.Add(Ui.Section(L.T("Por conta", "By account"), null, AccountTable(c, days)));
 
             Content = sp;
         }
@@ -528,7 +528,7 @@ namespace ClawdDesktop
         UIElement AccountTable(Cfg c, List<string> days)
         {
             var g = new Grid();
-            string[] heads = { "Conta", "Custo", "Tempo", "Sessões", "Tarefas", "Erros" };
+            string[] heads = { L.T("Conta", "Account"), L.T("Custo", "Cost"), L.T("Tempo", "Time"), L.T("Sessões", "Sessions"), L.T("Tarefas", "Tasks"), L.T("Erros", "Errors") };
             for (int i = 0; i < heads.Length; i++) g.ColumnDefinitions.Add(new ColumnDefinition { Width = i == 0 ? new GridLength(2, GridUnitType.Star) : new GridLength(1, GridUnitType.Star) });
             g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(28) });
             for (int i = 0; i < heads.Length; i++)

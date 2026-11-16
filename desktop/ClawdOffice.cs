@@ -22,7 +22,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     sealed class OfficeSector
     {
@@ -170,7 +170,7 @@ namespace ClawdDesktop
                 sectorSig = sig;
                 sectors.Clear();
                 foreach (var a in c.Accounts) sectors.Add(NewSector(a.Key, a.Name, a, a.Body, a.Detail));
-                if (visitors) sectors.Add(NewSector("", "Visitantes", null, "#7a7f8a", "#ffd23f"));
+                if (visitors) sectors.Add(NewSector("", L.T("Visitantes", "Visitors"), null, "#7a7f8a", "#ffd23f"));
                 geoDirty = true;
                 foreach (var d in desks.Values) { var sec = SectorOf(d.Sector.Key); if (sec != null) d.Sector = sec; }
             }
@@ -594,7 +594,7 @@ namespace ClawdDesktop
             if (Hover != null) DrawHoverCard(dc);
             if (sectors.Count == 0)
             {
-                var ft = Txt("Nenhuma conta do Claude encontrada ainda.", 15, TextDim, false, 0);
+                var ft = Txt(L.T("Nenhuma conta do Claude encontrada ainda.", "No Claude account found yet."), 15, TextDim, false, 0);
                 dc.DrawText(ft, new Point((w - ft.Width) / 2, h / 2 - 10));
             }
         }
@@ -662,10 +662,10 @@ namespace ClawdDesktop
             double textW = pr.Width - 30 - (lw > 0 ? lw + 12 : 0);
             dc.DrawText(Txt(sec.Name, 13.5, TextMain, true, textW), new Point(pr.X + 20, pr.Y + 4));
             var bits = new List<string>();
-            if (sec.Acc != null) bits.Add(sec.Running ? "aberto" : "fechado");
-            bits.Add(sec.Active == 0 ? "ninguém trabalhando" : sec.Active == 1 ? "1 sessão" : sec.Active + " sessões");
-            if (sec.CostToday > 0) bits.Add("hoje " + Words.Money(sec.CostToday));
-            if (sec.Overflow > 0) bits.Add("+" + sec.Overflow + " sem mesa");
+            if (sec.Acc != null) bits.Add(sec.Running ? L.T("aberto", "open") : L.T("fechado", "closed"));
+            bits.Add(sec.Active == 0 ? L.T("ninguém trabalhando", "nobody working") : sec.Active == 1 ? L.T("1 sessão", "1 session") : sec.Active + L.T(" sessões", " sessions"));
+            if (sec.CostToday > 0) bits.Add(L.T("hoje ", "today ") + Words.Money(sec.CostToday));
+            if (sec.Overflow > 0) bits.Add("+" + sec.Overflow + L.T(" sem mesa", " without a desk"));
             dc.DrawText(Txt(string.Join(" · ", bits.ToArray()), 11, TextDim, false, textW), new Point(pr.X + 20, pr.Y + 22));
         }
 
@@ -700,7 +700,7 @@ namespace ClawdDesktop
             Px(dc, WallTop, l.X - Wall, l.Y - Wall, Wall, l.Height + 2 * Wall);
             Px(dc, WallTop, l.Right, l.Y - Wall, Wall, l.Height * 0.55 - 18 + Wall);
             Px(dc, WallTop, l.Right, l.Y + l.Height * 0.55 + 18, Wall, l.Height * 0.45 - 18 + Wall);
-            var title = Txt("Copa", 11, TextFaint, true, 0);
+            var title = Txt(L.T("Copa", "Break room"), 11, TextFaint, true, 0);
             dc.DrawText(title, new Point(l.X + 10, l.Y + 6));
 
             // café e bebedouro
@@ -742,7 +742,7 @@ namespace ClawdDesktop
             DrawPlant(dc, l.X + 18, l.Bottom - 8);
             DrawPlant(dc, l.Right - 40, l.Bottom - 8);
             // saída
-            var sai = Txt("saída", 10, TextFaint, false, 0);
+            var sai = Txt(L.T("saída", "exit"), 10, TextFaint, false, 0);
             dc.DrawText(sai, new Point(l.Right - sai.Width - 12, l.Y + l.Height * 0.55 - 6));
         }
 
@@ -993,12 +993,12 @@ namespace ClawdDesktop
             Brush edge = null;
             if (w.Goal == "stand" && st == "aguardando")
             {
-                text = d.S.Tool == "AskUserQuestion" ? "Uma pergunta!" : d.S.Tool == "ExitPlanMode" ? "Aprova o plano?" : "Posso?";
+                text = d.S.Tool == "AskUserQuestion" ? L.T("Uma pergunta!", "A question!") : d.S.Tool == "ExitPlanMode" ? L.T("Aprova o plano?", "Approve the plan?") : L.T("Posso?", "May I?");
                 edge = Ui.Ask;
             }
             else if (w.Goal == "seat" && (st == "pensando" || st == "compactando")) text = new string('.', 1 + (int)(t * 2.5) % 3).PadRight(3);
-            else if (w.Goal == "seat" && st == "erro") { text = "Ops!"; edge = Ui.Bad; }
-            else if (w.Goal == "seat" && st == "feito") { text = "Pronto!"; edge = Ui.Good; }
+            else if (w.Goal == "seat" && st == "erro") { text = L.T("Ops!", "Oops!"); edge = Ui.Bad; }
+            else if (w.Goal == "seat" && st == "feito") { text = L.T("Pronto!", "Done!"); edge = Ui.Good; }
             if (text == null) return;
             var ft = new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, mono, 11, BubbleInk, ppd);
             double bw = Math.Round(ft.Width + 12), bh = 18;

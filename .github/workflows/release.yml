@@ -1,4 +1,4 @@
-# Uma tag vX.Y.Z vira uma release com o instalador ClawdSetup.exe e o SHA-256 dele, que a
+# Uma tag vX.Y.Z vira uma release com o instalador ClawdeskSetup.exe e o SHA-256 dele, que a
 # atualização automática do app confere antes de instalar.
 name: release
 
@@ -28,12 +28,12 @@ jobs:
       - name: Calcular o SHA-256
         shell: powershell
         run: |
-          $h = (Get-FileHash dist/ClawdSetup.exe -Algorithm SHA256).Hash.ToLower()
-          [IO.File]::WriteAllText("dist/ClawdSetup.exe.sha256", "$h  ClawdSetup.exe`n")
+          $h = (Get-FileHash dist/ClawdeskSetup.exe -Algorithm SHA256).Hash.ToLower()
+          [IO.File]::WriteAllText("dist/ClawdeskSetup.exe.sha256", "$h  ClawdeskSetup.exe`n")
           Write-Output "SHA-256: $h"
 
       - name: Publicar a release
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create $env:GITHUB_REF_NAME dist/ClawdSetup.exe dist/ClawdSetup.exe.sha256 --title "Clawd Companheiro $env:GITHUB_REF_NAME" --generate-notes
+        run: gh release create $env:GITHUB_REF_NAME dist/ClawdeskSetup.exe dist/ClawdeskSetup.exe.sha256 --title "Clawdesk $env:GITHUB_REF_NAME" --generate-notes

@@ -1,9 +1,11 @@
 {
-  "name": "clawd-companheiro",
-  "version": "1.2.0",
-  "description": "Um Clawd por sessão no Claude Desktop: passeia no fundo, anima o indicador de trabalho conforme a ferramenta, lista as sessões num painel e lembra de você entre sessões. Aplica o tema de cada conta.",
-  "author": { "name": "alexzjss" },
-  "repository": "https://github.com/alexzjss/clawd-companheiro",
+  "name": "clawdesk",
+  "version": "1.3.0",
+  "description": "Clawdesk: one Clawd per session in Claude Desktop. It walks around the background, animates the work indicator for each tool, lists sessions in a panel, remembers you between sessions and applies each account's theme. Speaks English and Portuguese.",
+  "author": {
+    "name": "alexzjss"
+  },
+  "repository": "https://github.com/alexzjss/clawdesk",
   "license": "MIT",
   "types": "./types/index.d.ts"
 }
