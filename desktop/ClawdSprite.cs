@@ -1,4 +1,4 @@
-// O desenho do Clawd em pixels, usado pelos Clawds da área de trabalho e pela Central:
+﻿// O desenho do Clawd em pixels, usado pelos Clawds da área de trabalho e pela Central:
 // a grade, as cores, a pose e as partes do corpo.
 
 using System;
@@ -478,6 +478,21 @@ namespace ClawdDesktop
                 }
                 g.Stamp(part.Art, ox + part.X, oy + part.Y);
             }
+        }
+
+        // O Clawd numa pose qualquer (o escritório da Home usa: sentado, digitando, acenando).
+        public static void DrawPose(Pix g, Skin skin, string model, Pose p, double t)
+        {
+            Geo geo = GeoOf(p);
+            DrawParts(g, skin, "tras", geo);
+            DrawLegs(g, p, geo, t);
+            DrawArm(g, p.ArmL, p.LenL, geo, -1, p.Frame);
+            DrawArm(g, p.ArmR, p.LenR, geo, 1, p.Frame);
+            DrawBody(g, p, geo);
+            DrawParts(g, skin, "corpo", geo);
+            DrawFace(g, p, geo);
+            DrawParts(g, skin, "frente", geo);
+            if (!string.IsNullOrEmpty(model)) DrawHat(g, model, geo);
         }
 
         // O Clawd parado, de frente para a direita: para as prévias da Central.

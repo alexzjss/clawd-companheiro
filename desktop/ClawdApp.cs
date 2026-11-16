@@ -70,7 +70,6 @@ namespace ClawdDesktop
             Stage.SessionsRead += OnSessions;
             Stage.OpenAppRequested += delegate { OpenWindow("home"); };
             Stage.QuitRequested += Quit;
-            Stage.HoverChanged += delegate(Creature c) { if (win != null) win.Home.Highlight(c != null ? c.SessionId : null); };
             Tray.OpenPage += OpenWindow;
             Tray.ToggleTaskbar += delegate { Cfg.Taskbar = !Cfg.Taskbar; SaveNow(); SyncTray(); Reloaded(); };
             Tray.ToggleQuiet += delegate { Cfg.Notify.QuietUntil = Cfg.Notify.QuietUntil > Data.NowMs() ? 0 : Data.NowMs() + 3600000; SaveNow(); SyncTray(); Reloaded(); };
@@ -254,13 +253,16 @@ namespace ClawdDesktop
                 Stage.PhotoSession(a, "a2", 1, "aguardando", "AskUserQuestion", "", "claude-fable-5-2", "Revisar o relatório", 0),
                 Stage.PhotoSession(b, "b1", 2, "trabalhando", "Edit", "codigo", "claude-sonnet-5-5", "Site novo", 2),
                 Stage.PhotoSession(b, "b2", 1, "pensando", "", "", "claude-haiku-5-5", "Lista de compras", 0),
+                Stage.PhotoSession(b, "b3", 1, "ocioso", "", "", "claude-sonnet-5-5", "Ideias de nomes", 0),
+                Stage.PhotoSession(a, "a3", 2, "feito", "", "", "claude-sonnet-5-5", "Planilha de custos", 0),
             };
-            Stage.PhotoSessions(fake);
             w.Go("home");
             w.UpdateLayout();
-            Stage.AttachHome(w.Home.StageView);
             w.OnSessions(fake.ToList(), Data.NowMs());
-            Stage.PhotoAdvance(3.2);
+            w.Home.Office.Advance(0.1);
+            w.OnSessions(fake.ToList(), Data.NowMs());
+            for (int i = 0; i < 120; i++) w.Home.Office.Advance(1.0 / 30);
+            w.Home.Office.Select("a2");
             w.Shoot(Path.Combine(dir, "app-home.png"));
             w.Go("estatisticas");
             w.Shoot(Path.Combine(dir, "app-estatisticas.png"));
@@ -295,7 +297,7 @@ namespace ClawdDesktop
 
         static readonly string[][] Pages =
         {
-            new[] { "home", "Home", Ui.IcHome, "Todas as sessões e os Clawds, juntos." },
+            new[] { "home", "Home", Ui.IcHome, "O escritório: cada conta é um setor, cada sessão um Clawd na sua mesa." },
             new[] { "estatisticas", "Estatísticas", Ui.IcChart, "Quanto o Claude trabalhou, quanto custou e no quê." },
             new[] { "contas", "Contas", Ui.IcPeople, "As contas do Claude Desktop, o tema de cada uma e o Clawd." },
             new[] { "configuracoes", "Configurações", Ui.IcSettings, "Clawds, avisos, mod do Claude Code e atualizações." },
@@ -321,7 +323,9 @@ namespace ClawdDesktop
                 try { DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 20, ref on, 4); } catch { }
             };
 
-            Home = new HomePage(app.Stage, delegate { return app.Cfg; });
+            Home = new HomePage(delegate { return app.Cfg; }, photo);
+            Home.Margin = new Thickness(18, 18, 18, 18);
+            Home.Visibility = Visibility.Collapsed;
             stats = new StatsPage(app.Hist, delegate { return app.Cfg; });
             accounts = new AccountsPage(delegate { return app.Cfg; }, app.Changed, photo);
             settings = new SettingsPage(app);
@@ -362,6 +366,7 @@ namespace ClawdDesktop
             scroll.Content = main;
             var content = new Grid();
             content.Children.Add(scroll);
+            content.Children.Add(Home);   // a Home é o escritório inteiro: sem título e sem rolagem
             content.Children.Add(overlay);
             Grid.SetColumn(content, 1);
             root.Children.Add(content);
@@ -379,7 +384,7 @@ namespace ClawdDesktop
                 app.ConfigReloaded -= OnReloaded;
                 app.Updater.Changed -= OnUpdaterChanged;
                 app.Hist.Changed -= OnHistChanged;
-                app.Stage.DetachHome();
+                app.Stage.SetAway(false);
             };
             PreviewKeyDown += delegate(object s, KeyEventArgs e)
             {
@@ -467,31 +472,28 @@ namespace ClawdDesktop
             subtitle.Text = info[3];
             switch (page)
             {
-                case "home": body.Content = Home; break;
+                case "home": body.Content = null; break;
                 case "estatisticas": stats.Refresh(); statsBuilt = DateTime.Now; body.Content = stats; break;
                 case "contas": body.Content = accounts; break;
                 default: settings.Refresh(); body.Content = settings; break;
             }
             scroll.ScrollToTop();
+            Home.Visibility = page == "home" ? Visibility.Visible : Visibility.Collapsed;
+            scroll.Visibility = page == "home" ? Visibility.Collapsed : Visibility.Visible;
             BuildNav();
             SyncHome();
         }
 
-        // Os Clawds moram na Home enquanto ela está à vista.
+        // Enquanto a Home está à vista, os Clawds estão no escritório: somem da barra de tarefas.
         void SyncHome()
         {
-            bool want = page == "home" && IsVisible && WindowState != WindowState.Minimized;
-            if (!want) { app.Stage.DetachHome(); return; }
-            // espera a Home ter tamanho
-            Dispatcher.BeginInvoke(new Action(delegate
-            {
-                if (page == "home" && IsVisible && WindowState != WindowState.Minimized) app.Stage.AttachHome(Home.StageView);
-            }), DispatcherPriority.Loaded);
+            if (photo) return;
+            app.Stage.SetAway(page == "home" && IsVisible && WindowState != WindowState.Minimized);
         }
 
         public void OnSessions(List<SessionView> all, double now)
         {
-            Home.Update(all, now);
+            Home.Update(all, now, app.Stage.Running);
             accounts.Status(app.Stage.Running, all, now);
         }
 
@@ -541,13 +543,13 @@ namespace ClawdDesktop
 
             // ---- Clawds
             var clawds = new StackPanel();
-            clawds.Children.Add(Ui.Setting("Clawds em cima da barra de tarefas", "Fora da Home, eles ficam no canto da tela. Com a Home aberta, moram lá dentro.",
+            clawds.Children.Add(Ui.Setting("Clawds em cima da barra de tarefas", "Fora da Home, eles ficam no canto da tela. Com a Home aberta, vão trabalhar no escritório.",
                 Ui.Toggle(c.Taskbar, delegate(bool v) { c.Taskbar = v; Changed(); })));
             clawds.Children.Add(Ui.Divider());
             clawds.Children.Add(Ui.Setting("Canto da tela", null,
                 Ui.Segmented(new[] { "Esquerdo", "Direito" }, c.Corner == "esquerdo" ? 0 : 1, delegate(int i) { c.Corner = i == 0 ? "esquerdo" : "direito"; Changed(); Refresh(); })));
             clawds.Children.Add(Ui.Divider());
-            clawds.Children.Add(Ui.Setting("Brincadeiras na barra de tarefas", "De tempo em tempo, os Clawds livres brincam juntos. Na Home eles sempre brincam.",
+            clawds.Children.Add(Ui.Setting("Brincadeiras na barra de tarefas", "De tempo em tempo, os Clawds livres brincam juntos.",
                 Ui.Toggle(c.Events, delegate(bool v) { c.Events = v; Changed(); })));
             sp.Children.Add(Ui.Section("Clawds", null, clawds));
 

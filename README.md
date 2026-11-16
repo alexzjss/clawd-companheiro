@@ -45,13 +45,20 @@ Se o instalador não achar o Claude Code, dá para instalar o mod depois em **Co
 
 O Clawd Companheiro fica na bandeja, perto do relógio. Clique no ícone para abrir a janela; o botão direito tem atalhos para as páginas, ligar e desligar os Clawds da barra, o modo não perturbe, as atualizações e Sair. Fechar a janela não fecha o app. `Ctrl+1` a `Ctrl+4` trocam de página.
 
-### Home
+### Home: o escritório
 
-![A Home: os Clawds no alto e as sessões em cartões](docs/app-home.png)
+![A Home: um escritório visto de cima, com um setor por conta](docs/app-home.png)
 
-Todas as sessões de todas as contas numa tela só, em cartões: o que cada uma está fazendo, há quanto tempo, modelo, subagentes, contexto e custo. Quem está esperando você aparece primeiro, e dá para filtrar por "Ativas", "Esperando você" e por conta. Embaixo ficam os limites de uso de cada conta.
+A Home é um escritório em pixel art visto de cima, ocupando a janela inteira. **Cada conta é um setor**: uma sala com o carpete na cor dela e uma placa com o nome, se o Claude está aberto, quantas sessões estão ativas, o custo do dia e os limites de uso. **Cada sessão é um Clawd com a sua mesa** (o mais antigo da conta é o grande, como na barra de tarefas):
 
-**Com a Home aberta, os Clawds saem de cima da barra de tarefas e pulam para dentro dela**, num cenário que acompanha a hora do dia. Lá eles brincam mais vezes, vêm correndo quando você clica no chão, e passar o mouse num Clawd acende o cartão da sessão dele (clicar num cartão faz o Clawd da sessão dar um alô). Minimizou, fechou ou trocou de página, eles voltam para a barra.
+- **trabalhando:** sentado, digitando; a tela do computador mostra o tipo de trabalho (terminal, código, web, plano, subagentes);
+- **pensando:** sentado, com reticências num balão; **terminou:** comemora com confete; **deu erro:** tela vermelha;
+- **esperando você:** levanta da mesa e acena, com um balão de pergunta;
+- **livre:** vai para a copa (café, bebedouro, estante) ou passeia pela sala; **dormindo:** cochila no sofá;
+- **subagentes** são robozinhos em volta da mesa;
+- sessão nova entra pela porta da copa e vai até a mesa; sessão que parou sai pela porta, e a mesa fica vazia por uns minutos.
+
+Passe o mouse num Clawd ou numa mesa para ver a sessão; clique para fazer carinho e abrir os detalhes (modelo, subagentes, turnos, custo, contexto e o botão para abrir o Claude da conta); duplo clique abre o Claude direto. Enquanto a Home está à vista, os Clawds saem da barra de tarefas e vão trabalhar no escritório; minimizou, fechou ou trocou de página, eles voltam para a barra.
 
 ### Estatísticas
 
@@ -130,7 +137,8 @@ types/              o contrato de estado do mod
 desktop/            o app (C# 5, WPF, sem dependências)
   ClawdApp.cs         início, bandeja, janela e Configurações
   ClawdDesktop.cs     os Clawds (o palco, na barra de tarefas ou na Home)
-  ClawdHome.cs        a Home
+  ClawdHome.cs        a Home (o escritório, o resumo e os detalhes)
+  ClawdOffice.cs      o escritório visto de cima
   ClawdHistory.cs     o histórico e as Estatísticas
   ClawdContas.cs      a página Contas
   ClawdServices.cs    bandeja, avisos e atualização automática

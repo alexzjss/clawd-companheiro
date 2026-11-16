@@ -63,7 +63,7 @@ function Compile([string]$exe, [string]$title, [string[]]$sources, [string[]]$ex
 
 $app = Join-Path $Out 'Clawd.exe'
 Compile $app 'Clawd Companheiro' @(
-  'ClawdApp.cs', 'ClawdDesktop.cs', 'ClawdHome.cs', 'ClawdHistory.cs', 'ClawdContas.cs',
+  'ClawdApp.cs', 'ClawdDesktop.cs', 'ClawdHome.cs', 'ClawdOffice.cs', 'ClawdHistory.cs', 'ClawdContas.cs',
   'ClawdServices.cs', 'ClawdUi.cs', 'ClawdShared.cs', 'ClawdSprite.cs', 'ClawdConfig.cs'
 ) @()
 
