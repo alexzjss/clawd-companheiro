@@ -6,8 +6,8 @@ param([switch]$Uninstall, [switch]$NoStartup)
 
 $app = Join-Path $env:USERPROFILE '.claude\clawd\app'
 $menu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
-$lnk = Join-Path $menu 'Clawd Companheiro.lnk'
-$boot = Join-Path $menu 'Startup\Clawd Companheiro.lnk'
+$lnk = Join-Path $menu 'Clawdesk.lnk'
+$boot = Join-Path $menu 'Startup\Clawdesk.lnk'
 $old = @('Clawd.lnk', 'Central dos Clawds.lnk', 'Startup\Clawd.lnk') | ForEach-Object { Join-Path $menu $_ }
 
 Get-Process Clawd, ClawdDesktop, ClawdCentral -ErrorAction SilentlyContinue | Stop-Process -Force
@@ -17,7 +17,7 @@ foreach ($exe in 'ClawdDesktop.exe', 'ClawdCentral.exe') { Remove-Item -LiteralP
 
 if ($Uninstall) {
   foreach ($p in $lnk, $boot) { Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue }
-  Remove-Item -LiteralPath (Join-Path $app 'Clawd.exe') -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath (Join-Path $app 'Clawdesk.exe') -Force -ErrorAction SilentlyContinue
   Write-Output 'Removido. As suas escolhas continuam em ~\.claude\clawd.'
   exit 0
 }
@@ -25,7 +25,7 @@ if ($Uninstall) {
 & (Join-Path $PSScriptRoot 'desktop\build.ps1') -Out $app
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$exePath = Join-Path $app 'Clawd.exe'
+$exePath = Join-Path $app 'Clawdesk.exe'
 $shell = New-Object -ComObject WScript.Shell
 foreach ($l in @(@{ Path = $lnk; Args = '' }, @{ Path = $boot; Args = '--fundo' })) {
   if ($NoStartup -and $l.Path -eq $boot) { Remove-Item -LiteralPath $boot -Force -ErrorAction SilentlyContinue; continue }
@@ -38,4 +38,4 @@ foreach ($l in @(@{ Path = $lnk; Args = '' }, @{ Path = $boot; Args = '--fundo' 
 }
 
 Start-Process $exePath
-Write-Output 'Pronto. O Clawd Companheiro abriu e fica na bandeja do Windows.'
+Write-Output 'Pronto. O Clawdesk abriu e fica na bandeja do Windows.'

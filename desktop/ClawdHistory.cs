@@ -16,7 +16,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     sealed class AccDay
     {

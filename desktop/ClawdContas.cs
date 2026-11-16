@@ -22,7 +22,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using IOPath = System.IO.Path;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     // ------------------------------------------------------------- desenhos --
 
@@ -534,7 +534,7 @@ namespace ClawdDesktop
         void Try(Action f)
         {
             try { f(); }
-            catch (Exception e) { MessageBox.Show(Window.GetWindow(this), e.Message, "Clawd Companheiro", MessageBoxButton.OK, MessageBoxImage.Warning); }
+            catch (Exception e) { MessageBox.Show(Window.GetWindow(this), e.Message, "Clawdesk", MessageBoxButton.OK, MessageBoxImage.Warning); }
         }
 
         void AddAccount()

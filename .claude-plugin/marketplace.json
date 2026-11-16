@@ -1,5 +1,5 @@
 {
-  "name": "clawd-companheiro",
+  "name": "clawdesk",
   "owner": { "name": "alexzjss" },
-  "plugins": [{ "name": "clawd-companheiro", "source": "./", "description": "Um Clawd por sessão: anima o indicador de trabalho, passeia no fundo da conversa, lembra de você e aplica o tema de cada conta." }]
+  "plugins": [{ "name": "clawdesk", "source": "./", "description": "Um Clawd por sessão: anima o indicador de trabalho, passeia no fundo da conversa, lembra de você e aplica o tema de cada conta." }]
 }

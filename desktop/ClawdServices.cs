@@ -15,7 +15,7 @@ using System.Web.Script.Serialization;
 using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     // ------------------------------------------------------------- bandeja --
 
@@ -192,7 +192,7 @@ namespace ClawdDesktop
 
     // --------------------------------------------------------- atualização --
 
-    // Procura a última release no GitHub e, se for mais nova, baixa o ClawdSetup.exe, confere
+    // Procura a última release no GitHub e, se for mais nova, baixa o ClawdeskSetup.exe, confere
     // o SHA-256 publicado junto e roda o instalador em modo silencioso.
     sealed class Updater
     {
@@ -229,7 +229,7 @@ namespace ClawdDesktop
         {
             ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;   // TLS 1.2
             var w = new WebClient();
-            w.Headers[HttpRequestHeader.UserAgent] = "ClawdCompanheiro/" + AppPaths.Version;
+            w.Headers[HttpRequestHeader.UserAgent] = "Clawdesk/" + AppPaths.Version;
             w.Encoding = Encoding.UTF8;
             return w;
         }
@@ -267,8 +267,8 @@ namespace ClawdDesktop
                     {
                         var a = o as Dictionary<string, object>;
                         string name = Json.Str(a, "name", "");
-                        if (name.Equals("ClawdSetup.exe", StringComparison.OrdinalIgnoreCase)) setup = Json.Str(a, "browser_download_url", null);
-                        if (name.Equals("ClawdSetup.exe.sha256", StringComparison.OrdinalIgnoreCase)) sha = Json.Str(a, "browser_download_url", null);
+                        if (name.Equals("ClawdeskSetup.exe", StringComparison.OrdinalIgnoreCase)) setup = Json.Str(a, "browser_download_url", null);
+                        if (name.Equals("ClawdeskSetup.exe.sha256", StringComparison.OrdinalIgnoreCase)) sha = Json.Str(a, "browser_download_url", null);
                     }
                     string notes = Json.Str(d, "body", "");
                     string page = Json.Str(d, "html_url", "https://github.com/" + AppPaths.Repo + "/releases/latest");
@@ -299,9 +299,9 @@ namespace ClawdDesktop
             {
                 try
                 {
-                    string dir = Path.Combine(Path.GetTempPath(), "ClawdCompanheiro");
+                    string dir = Path.Combine(Path.GetTempPath(), "Clawdesk");
                     Directory.CreateDirectory(dir);
-                    string file = Path.Combine(dir, "ClawdSetup-" + ver + ".exe");
+                    string file = Path.Combine(dir, "ClawdeskSetup-" + ver + ".exe");
                     using (var w = Client()) w.DownloadFile(url, file);
                     if (shaUrl != null)
                     {

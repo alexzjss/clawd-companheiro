@@ -40,7 +40,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     // ------------------------------------------------------------------ Windows --
 
@@ -281,7 +281,7 @@ namespace ClawdDesktop
             if (id.Length == 0) return EveryMs;
             int every = tok.Length > 0 ? EveryMs : NoTokenMs;
             var req = (HttpWebRequest)WebRequest.Create("https://api.github.com/gists/" + id);
-            req.UserAgent = "clawd-companheiro";
+            req.UserAgent = "clawdesk";
             req.Accept = "application/vnd.github+json";
             req.Headers["X-GitHub-Api-Version"] = "2022-11-28";
             if (tok.Length > 0) req.Headers["Authorization"] = "Bearer " + tok;
@@ -2328,7 +2328,7 @@ namespace ClawdDesktop
             menu.Items.Add(Item("Fazer carinho", false, delegate { Pet(c, T); }));
             menu.Items.Add(Item("Esconder por 1 hora", false, delegate { a.HiddenUntil = T + 3600; a.Visible = false; a.Main = null; a.Pups.Clear(); }));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Abrir o Clawd Companheiro", false, delegate { if (OpenAppRequested != null) OpenAppRequested(); }));
+            menu.Items.Add(Item("Abrir o Clawdesk", false, delegate { if (OpenAppRequested != null) OpenAppRequested(); }));
             string other = corner == "esquerdo" ? "direito" : "esquerdo";
             menu.Items.Add(Item("Ficar no canto " + other, false, delegate { SetCorner(other); }));
             menu.Items.Add(Item("Tirar da barra de tarefas", false, delegate { SetTaskbar(false); }));

@@ -9,13 +9,13 @@ import { PASSING, RELAY_BACKOFF_MS, gistHeaders, relayDue, relayFile, relayFrom,
 import type { Relay } from './relay'
 import type { ContaTema } from './themes'
 
-const PLUGIN = 'clawd-companheiro'
+const PLUGIN = 'clawdesk'
 const PANE = 'clawd-sessoes'
 const SCENE = 'clawd'
 
-const activity = atom({ plugin: 'clawd-companheiro', key: 'activity' } as const, { kind: 'ocioso', since: 0 } as Activity)
-const moodAtom = atom({ plugin: 'clawd-companheiro', key: 'mood' } as const, 'tranquilo' as Mood)
-const sessions = atom({ plugin: 'clawd-companheiro', key: 'sessions' } as const, [] as SessionInfo[])
+const activity = atom({ plugin: 'clawdesk', key: 'activity' } as const, { kind: 'ocioso', since: 0 } as Activity)
+const moodAtom = atom({ plugin: 'clawdesk', key: 'mood' } as const, 'tranquilo' as Mood)
+const sessions = atom({ plugin: 'clawdesk', key: 'sessions' } as const, [] as SessionInfo[])
 
 // Quanto tempo cada estado passageiro fica na tela, e quando o Clawd pega no sono.
 const SHORT_MS = 9_000

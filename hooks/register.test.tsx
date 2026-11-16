@@ -6,7 +6,7 @@ import { customTheme, surfaces } from './themes'
 import { ANIMS, PALETTES, animForTool, clawdSvg } from './sprites'
 
 type T = Parameters<Extract<Parameters<typeof test>[1], (...args: any[]) => any>>
-const SPINNER = { plugin: 'clawd-companheiro', component: 'Spinner', requestId: 'spin' } as const
+const SPINNER = { plugin: 'clawdesk', component: 'Spinner', requestId: 'spin' } as const
 
 // O motor embaixo do mod, sem disco (USERPROFILE ausente: nada é gravado).
 function engine(on: T[1], email: string, themes: unknown[]) {

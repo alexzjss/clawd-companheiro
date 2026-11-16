@@ -19,7 +19,7 @@ using System.Text.RegularExpressions;
 using System.Web.Script.Serialization;
 using System.Windows.Media;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     // ------------------------------------------------------------------- json --
 
@@ -541,7 +541,7 @@ namespace ClawdDesktop
         }
     }
 
-    // Quando o Clawd Companheiro avisa pelo Windows.
+    // Quando o Clawdesk avisa pelo Windows.
     sealed class NotifyCfg
     {
         public bool On = true, Done = true, Error = true, Waiting = true, Sound = false;

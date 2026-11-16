@@ -1,5 +1,5 @@
 # Compila o app e o instalador em cada push e pull request, para pegar erro de compilação
-# antes de uma release. O ClawdSetup.exe fica como artefato da execução.
+# antes de uma release. O ClawdeskSetup.exe fica como artefato da execução.
 name: build
 
 on:
@@ -20,8 +20,8 @@ jobs:
       - name: Guardar o instalador
         uses: actions/upload-artifact@v4
         with:
-          name: ClawdSetup
-          path: dist/ClawdSetup.exe
+          name: ClawdeskSetup
+          path: dist/ClawdeskSetup.exe
           retention-days: 14
 
       # Roda o app de verdade no modo de fotos: desenha os Clawds e todas as páginas da
@@ -30,14 +30,14 @@ jobs:
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force fotos | Out-Null
-          $p = Start-Process -FilePath dist/Clawd.exe -ArgumentList '--fotos', (Resolve-Path fotos) -Wait -PassThru
+          $p = Start-Process -FilePath dist/Clawdesk.exe -ArgumentList '--fotos', (Resolve-Path fotos) -Wait -PassThru
           if (Test-Path fotos/erro-fotos.txt) { Get-Content fotos/erro-fotos.txt }
-          if ($p.ExitCode -ne 0) { Write-Error "Clawd.exe --fotos saiu com $($p.ExitCode)"; exit 1 }
+          if ($p.ExitCode -ne 0) { Write-Error "Clawdesk.exe --fotos saiu com $($p.ExitCode)"; exit 1 }
           $want = 'clawds-trabalhando.png', 'clawds-painel.png', 'app-home.png', 'app-estatisticas.png', 'app-contas.png', 'app-configuracoes.png'
           foreach ($f in $want) { if (-not (Test-Path "fotos/$f")) { Write-Error "faltou fotos/$f"; exit 1 } }
-          $s = Start-Process -FilePath dist/ClawdSetup.exe -ArgumentList '--fotos', (Resolve-Path fotos) -Wait -PassThru
+          $s = Start-Process -FilePath dist/ClawdeskSetup.exe -ArgumentList '--fotos', (Resolve-Path fotos) -Wait -PassThru
           if (Test-Path fotos/erro-setup.txt) { Get-Content fotos/erro-setup.txt }
-          if ($s.ExitCode -ne 0) { Write-Error "ClawdSetup.exe --fotos saiu com $($s.ExitCode)"; exit 1 }
+          if ($s.ExitCode -ne 0) { Write-Error "ClawdeskSetup.exe --fotos saiu com $($s.ExitCode)"; exit 1 }
           Get-ChildItem fotos | Format-Table Name, Length
 
       - name: Guardar as fotos

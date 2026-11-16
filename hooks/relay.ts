@@ -97,7 +97,7 @@ export function gistHeaders(r: Relay): Record<string, string> {
   return {
     Accept: 'application/vnd.github+json',
     'Content-Type': 'application/json',
-    'User-Agent': 'clawd-companheiro',
+    'User-Agent': 'clawdesk',
     'X-GitHub-Api-Version': '2022-11-28',
     // Na nuvem o token pode vir do proxy do ambiente; aí não vai nada aqui.
     ...(r.token !== undefined ? { Authorization: `Bearer ${r.token}` } : {}),

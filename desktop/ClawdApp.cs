@@ -1,14 +1,14 @@
-// O Clawd Companheiro: um programa só, que fica rodando em segundo plano.
+// O Clawdesk: um programa só, que fica rodando em segundo plano.
 //
 //   - os Clawds em cima da barra de tarefas (Stage, em ClawdDesktop.cs)
 //   - o ícone na bandeja, os avisos do Windows e a busca de atualizações (ClawdServices.cs)
 //   - o histórico das sessões (ClawdHistory.cs)
 //   - a janela: Home, Estatísticas, Contas e Configurações
 //
-//   Clawd.exe              abre a janela (ou traz para a frente a que já está aberta)
-//   Clawd.exe --fundo      só os Clawds e a bandeja, sem janela (é assim que abre com o Windows)
-//   Clawd.exe --demo       os Clawds passam por todos os estados; --eventos, pelas brincadeiras
-//   Clawd.exe --fotos dir  desenha as imagens do README, com contas de mentira
+//   Clawdesk.exe              abre a janela (ou traz para a frente a que já está aberta)
+//   Clawdesk.exe --fundo      só os Clawds e a bandeja, sem janela (é assim que abre com o Windows)
+//   Clawdesk.exe --demo       os Clawds passam por todos os estados; --eventos, pelas brincadeiras
+//   Clawdesk.exe --fotos dir  desenha as imagens do README, com contas de mentira
 //
 // Compilar: build.ps1 (csc do .NET Framework 4, C# 5).
 
@@ -29,7 +29,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
-namespace ClawdDesktop
+namespace Clawdesk
 {
     // ------------------------------------------------------------------- app --
 
@@ -51,7 +51,7 @@ namespace ClawdDesktop
         public string ModMessage;
         public event Action ModChanged, ConfigReloaded;
         readonly bool photo;
-        bool updateNoticeShown, trayTipShown;
+        bool updateNoticeShown, trayTipShown, migrated;
 
         public App(bool demo, bool festa, bool photo)
         {
@@ -172,6 +172,8 @@ namespace ClawdDesktop
                     ModBusy = false;
                     ModMessage = null;
                     if (ModChanged != null) ModChanged();
+                    // o mod ainda com o nome de antes do Clawdesk: troca sozinho, uma vez
+                    if (st.Legacy && !st.Installed && st.Claude != null && !migrated && !photo) { migrated = true; InstallMod(); }
                 }));
             });
         }
@@ -212,7 +214,7 @@ namespace ClawdDesktop
                     if (!trayTipShown && Tray != null)
                     {
                         trayTipShown = true;
-                        Tray.Notify("O Clawd Companheiro continua aqui", "Ele fica na bandeja, de olho nas sessões. Para fechar de vez, use Sair no menu do ícone.", null);
+                        Tray.Notify("O Clawdesk continua aqui", "Ele fica na bandeja, de olho nas sessões. Para fechar de vez, use Sair no menu do ícone.", null);
                     }
                 };
                 win.Show();
@@ -789,7 +791,7 @@ namespace ClawdDesktop
     static class Program
     {
         static string logPath = Path.Combine(AppPaths.DataDir, "app.log");
-        const string MutexName = "Local\\ClawdCompanheiro", OpenSignal = "Local\\ClawdCompanheiro.Abrir";
+        const string MutexName = "Local\\Clawdesk", OpenSignal = "Local\\Clawdesk.Abrir";
 
         public static void Log(string text)
         {
@@ -864,9 +866,9 @@ namespace ClawdDesktop
                             }
                         }) { IsBackground = true, Name = "abrir" }.Start();
                     };
-                    Log(demo ? "Clawd Companheiro abriu (demo)" : "Clawd Companheiro abriu " + AppPaths.Version);
+                    Log(demo ? "Clawdesk abriu (demo)" : "Clawdesk abriu " + AppPaths.Version);
                     app.Run();
-                    Log("Clawd Companheiro fechou");
+                    Log("Clawdesk fechou");
                 }
             }
         }

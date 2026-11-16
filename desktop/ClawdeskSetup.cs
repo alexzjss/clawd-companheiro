@@ -1,15 +1,15 @@
-﻿// Instalador do Clawd Companheiro: um .exe só, com o programa dentro.
+﻿// Instalador do Clawdesk: um .exe só, com o programa dentro.
 //
 // Um assistente em quatro passos (boas-vindas, opções, instalação e pronto). Copia o
-// Clawd.exe para ~/.claude/clawd/app, tira os programas de antes da 1.2, cria os atalhos,
+// Clawdesk.exe para ~/.claude/clawd/app, tira os programas de antes da 1.2, cria os atalhos,
 // registra em "Aplicativos instalados" e, se a pessoa quiser, instala ou atualiza o mod do
 // Claude Code. Rodar de novo atualiza. As escolhas da pessoa (config.json, skins, histórico)
 // só são apagadas se ela pedir, na desinstalação.
 //
-//   ClawdSetup.exe                  o assistente
-//   ClawdSetup.exe /quiet           instala sem perguntar (é o que a atualização automática usa)
-//   ClawdSetup.exe /quiet /abrir    idem, e abre a janela no fim
-//   ClawdSetup.exe /uninstall       remove (com /quiet, sem perguntar)
+//   ClawdeskSetup.exe                  o assistente
+//   ClawdeskSetup.exe /quiet           instala sem perguntar (é o que a atualização automática usa)
+//   ClawdeskSetup.exe /quiet /abrir    idem, e abre a janela no fim
+//   ClawdeskSetup.exe /uninstall       remove (com /quiet, sem perguntar)
 
 using System;
 using System.Collections.Generic;
@@ -24,9 +24,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Microsoft.Win32;
-using ClawdDesktop;
+using Clawdesk;
 
-namespace ClawdSetup
+namespace ClawdeskSetup
 {
     sealed class Options
     {
@@ -35,10 +35,12 @@ namespace ClawdSetup
 
     static class Installer
     {
-        const string RegKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\ClawdCompanheiro";
+        const string RegKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Clawdesk";
+        // o registro de quando o app se chamava Clawd Companheiro
+        const string OldRegKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\ClawdCompanheiro";
         static string Self { get { return Assembly.GetExecutingAssembly().Location; } }
         public static string Exe { get { return System.IO.Path.Combine(AppPaths.AppDir, AppPaths.Exe); } }
-        public static string Kept { get { return System.IO.Path.Combine(AppPaths.AppDir, "ClawdSetup.exe"); } }
+        public static string Kept { get { return System.IO.Path.Combine(AppPaths.AppDir, "ClawdeskSetup.exe"); } }
 
         public static bool IsInstalled { get { return File.Exists(Exe) || AppPaths.OldExes.Any(e => File.Exists(System.IO.Path.Combine(AppPaths.AppDir, e))); } }
 
@@ -46,7 +48,13 @@ namespace ClawdSetup
         {
             get
             {
-                try { using (var k = Registry.CurrentUser.OpenSubKey(RegKey)) return k != null ? k.GetValue("DisplayVersion") as string : null; }
+                try
+                {
+                    foreach (string key in new[] { RegKey, OldRegKey })
+                        using (var k = Registry.CurrentUser.OpenSubKey(key))
+                            if (k != null && k.GetValue("DisplayVersion") is string) return (string)k.GetValue("DisplayVersion");
+                    return null;
+                }
                 catch { return null; }
             }
         }
@@ -90,7 +98,7 @@ namespace ClawdSetup
 
         public static void StopPrograms()
         {
-            foreach (string name in new[] { "Clawd", "ClawdDesktop", "ClawdCentral" })
+            foreach (string name in new[] { "Clawdesk" }.Concat(AppPaths.OldProcesses))
                 foreach (var p in Process.GetProcessesByName(name))
                 {
                     try { p.Kill(); p.WaitForExit(4000); } catch { }
@@ -129,6 +137,8 @@ namespace ClawdSetup
             {
                 try { File.Delete(System.IO.Path.Combine(AppPaths.Menu, lnk)); } catch { }
             }
+            try { File.Delete(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Clawd Companheiro.lnk")); } catch { }
+            try { Registry.CurrentUser.DeleteSubKey(OldRegKey, false); } catch { }
         }
 
         public static void Shortcuts(Options o)
@@ -176,7 +186,7 @@ namespace ClawdSetup
             try
             {
                 var st = ModTool.Status();
-                if (st.Installed) ModTool.InstallOrUpdate(st);
+                if (st.Installed || st.Legacy) ModTool.InstallOrUpdate(st);
             }
             catch { }
             Launch(open);
@@ -375,7 +385,7 @@ namespace ClawdSetup
             sp.Children.Add(Option("Atalho na área de trabalho", null, opt.DesktopIcon, true, delegate(bool x) { opt.DesktopIcon = x; }));
             sp.Children.Add(Option(claude != null ? "Instalar ou atualizar o mod do Claude Code" : "Instalar o mod do Claude Code",
                 claude != null ? "É ele que conta ao app o que cada sessão faz." : "Precisa do Claude Code instalado. Dá para fazer depois, pelo app.", opt.Mod, claude != null, delegate(bool x) { opt.Mod = x; }));
-            sp.Children.Add(Option("Abrir o Clawd Companheiro no fim", null, opt.Open, true, delegate(bool x) { opt.Open = x; }));
+            sp.Children.Add(Option("Abrir o Clawdesk no fim", null, opt.Open, true, delegate(bool x) { opt.Open = x; }));
             page.Children.Add(sp);
             buttons.Children.Add(Button("Voltar", false, Welcome));
             buttons.Children.Add(Button(installed ? "Atualizar" : "Instalar", true, Install));
@@ -462,7 +472,7 @@ namespace ClawdSetup
                 var e = T(fail, 13, Bad, false);
                 e.Margin = new Thickness(0, 10, 0, 0);
                 sp.Children.Add(e);
-                var n = T("Feche o Clawd Companheiro se ele estiver aberto e tente de novo. Se continuar, abra uma issue no GitHub do projeto com essa mensagem.", 12.5, Dim, false);
+                var n = T("Feche o Clawdesk se ele estiver aberto e tente de novo. Se continuar, abra uma issue no GitHub do projeto com essa mensagem.", 12.5, Dim, false);
                 n.Margin = new Thickness(0, 10, 0, 0);
                 sp.Children.Add(n);
                 page.Children.Add(sp);
@@ -471,7 +481,7 @@ namespace ClawdSetup
                 return;
             }
             sp.Children.Add(T(installed ? "Atualizado!" : "Instalado!", 26, Text, true));
-            var msg = T(opt.Open ? "O Clawd Companheiro já abriu. Ele fica na bandeja do Windows, perto do relógio; feche a janela à vontade." : "O Clawd Companheiro está rodando na bandeja do Windows, perto do relógio.", 13.5, Text, false);
+            var msg = T(opt.Open ? "O Clawdesk já abriu. Ele fica na bandeja do Windows, perto do relógio; feche a janela à vontade." : "O Clawdesk está rodando na bandeja do Windows, perto do relógio.", 13.5, Text, false);
             msg.Margin = new Thickness(0, 10, 0, 0);
             sp.Children.Add(msg);
             if (triedMod && modFail == null)
@@ -583,7 +593,7 @@ namespace ClawdSetup
                 return code;
             }
             bool created;
-            using (var mutex = new Mutex(true, "Local\\ClawdSetup", out created))
+            using (var mutex = new Mutex(true, "Local\\ClawdeskSetup", out created))
             {
                 if (!created) return 1;
                 try
