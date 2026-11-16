@@ -26,7 +26,7 @@ jobs:
 
       # Roda o app de verdade no modo de fotos: desenha os Clawds e todas as páginas da
       # janela com contas de mentira. Se algo quebrar ao abrir, falha aqui.
-      - name: Tirar as fotos do README (teste de execução)
+      - name: Tirar as fotos do app e do instalador (teste de execução)
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force fotos | Out-Null
@@ -35,6 +35,9 @@ jobs:
           if ($p.ExitCode -ne 0) { Write-Error "Clawd.exe --fotos saiu com $($p.ExitCode)"; exit 1 }
           $want = 'clawds-trabalhando.png', 'clawds-painel.png', 'app-home.png', 'app-estatisticas.png', 'app-contas.png', 'app-configuracoes.png'
           foreach ($f in $want) { if (-not (Test-Path "fotos/$f")) { Write-Error "faltou fotos/$f"; exit 1 } }
+          $s = Start-Process -FilePath dist/ClawdSetup.exe -ArgumentList '--fotos', (Resolve-Path fotos) -Wait -PassThru
+          if (Test-Path fotos/erro-setup.txt) { Get-Content fotos/erro-setup.txt }
+          if ($s.ExitCode -ne 0) { Write-Error "ClawdSetup.exe --fotos saiu com $($s.ExitCode)"; exit 1 }
           Get-ChildItem fotos | Format-Table Name, Length
 
       - name: Guardar as fotos

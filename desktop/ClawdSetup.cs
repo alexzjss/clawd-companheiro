@@ -1,4 +1,4 @@
-// Instalador do Clawd Companheiro: um .exe só, com o programa dentro.
+﻿// Instalador do Clawd Companheiro: um .exe só, com o programa dentro.
 //
 // Um assistente em quatro passos (boas-vindas, opções, instalação e pronto). Copia o
 // Clawd.exe para ~/.claude/clawd/app, tira os programas de antes da 1.2, cria os atalhos,
@@ -474,6 +474,35 @@ namespace ClawdSetup
             buttons.Children.Add(Button("Concluir", true, Close));
         }
 
+        // ---- fotos (as telas do assistente em arquivos, para conferir o visual no CI)
+
+        void Shoot(string file)
+        {
+            var root = (FrameworkElement)Content;
+            root.UpdateLayout();
+            Dispatcher.Invoke(new Action(delegate { }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+            var bmp = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(root.ActualWidth * 1.5), (int)(root.ActualHeight * 1.5), 144, 144, PixelFormats.Pbgra32);
+            var dv = new DrawingVisual();
+            using (var dc = dv.RenderOpen())
+            {
+                dc.DrawRectangle(Bg, null, new Rect(0, 0, root.ActualWidth, root.ActualHeight));
+                dc.DrawRectangle(new VisualBrush(root), null, new Rect(0, 0, root.ActualWidth, root.ActualHeight));
+            }
+            bmp.Render(dv);
+            var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bmp));
+            using (var fs = File.Create(file)) enc.Save(fs);
+        }
+
+        public void Photos(string dir)
+        {
+            Shoot(System.IO.Path.Combine(dir, "setup-1-inicio.png"));
+            Choose();
+            Shoot(System.IO.Path.Combine(dir, "setup-2-opcoes.png"));
+            Finish(null, "exemplo de erro", true);
+            Shoot(System.IO.Path.Combine(dir, "setup-4-pronto.png"));
+        }
+
         // ---- remover
 
         void Uninstall()
@@ -509,6 +538,28 @@ namespace ClawdSetup
         {
             Func<string, bool> has = name => args.Any(a => a.TrimStart('-', '/').Equals(name, StringComparison.OrdinalIgnoreCase));
             bool quiet = has("quiet") || has("silent");
+            int fi = Array.FindIndex(args, a => a.TrimStart('-', '/').Equals("fotos", StringComparison.OrdinalIgnoreCase));
+            if (fi >= 0)
+            {
+                string dir = fi + 1 < args.Length ? args[fi + 1] : ".";
+                Directory.CreateDirectory(dir);
+                var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+                int code = 0;
+                app.Startup += delegate
+                {
+                    try
+                    {
+                        var w = new SetupWindow { WindowStartupLocation = WindowStartupLocation.Manual, Left = -4000, Top = 0, ShowInTaskbar = false, ShowActivated = false };
+                        w.Show();
+                        w.Photos(dir);
+                        w.Close();
+                    }
+                    catch (Exception e) { try { File.WriteAllText(System.IO.Path.Combine(dir, "erro-setup.txt"), e.ToString()); } catch { } code = 3; }
+                    app.Shutdown();
+                };
+                app.Run();
+                return code;
+            }
             bool created;
             using (var mutex = new Mutex(true, "Local\\ClawdSetup", out created))
             {
