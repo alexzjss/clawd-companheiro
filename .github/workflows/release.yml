@@ -1,4 +1,5 @@
-# Uma tag vX.Y.Z vira uma release com o instalador ClawdSetup.exe.
+# Uma tag vX.Y.Z vira uma release com o instalador ClawdSetup.exe e o SHA-256 dele, que a
+# atualização automática do app confere antes de instalar.
 name: release
 
 on:
@@ -14,12 +15,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compilar os programas e o instalador
+      - name: Conferir a versão
+        shell: powershell
+        run: |
+          $v = (Get-Content VERSION -Raw).Trim()
+          if ("v$v" -ne $env:GITHUB_REF_NAME) { Write-Error "A tag $env:GITHUB_REF_NAME nao bate com o VERSION ($v)."; exit 1 }
+
+      - name: Compilar o app e o instalador
         shell: powershell
         run: ./desktop/build.ps1 -Out dist -Setup
+
+      - name: Calcular o SHA-256
+        shell: powershell
+        run: |
+          $h = (Get-FileHash dist/ClawdSetup.exe -Algorithm SHA256).Hash.ToLower()
+          [IO.File]::WriteAllText("dist/ClawdSetup.exe.sha256", "$h  ClawdSetup.exe`n")
+          Write-Output "SHA-256: $h"
 
       - name: Publicar a release
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create $env:GITHUB_REF_NAME dist/ClawdSetup.exe --title "Clawd Companheiro $env:GITHUB_REF_NAME" --generate-notes
+        run: gh release create $env:GITHUB_REF_NAME dist/ClawdSetup.exe dist/ClawdSetup.exe.sha256 --title "Clawd Companheiro $env:GITHUB_REF_NAME" --generate-notes

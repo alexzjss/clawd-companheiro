@@ -19,11 +19,6 @@ using System.Text.RegularExpressions;
 using System.Web.Script.Serialization;
 using System.Windows.Media;
 
-[assembly: System.Reflection.AssemblyTitle("Clawd Companheiro")]
-[assembly: System.Reflection.AssemblyProduct("Clawd Companheiro")]
-[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.1.0.0")]
-
 namespace ClawdDesktop
 {
     // ------------------------------------------------------------------- json --
@@ -546,10 +541,45 @@ namespace ClawdDesktop
         }
     }
 
+    // Quando o Clawd Companheiro avisa pelo Windows.
+    sealed class NotifyCfg
+    {
+        public bool On = true, Done = true, Error = true, Waiting = true, Sound = false;
+        public int MinSecs = 30;          // só avisa "terminou" se o turno durou pelo menos isto
+        public double QuietUntil;         // não perturbe até (ms desde 1970); 0 = desligado
+
+        public Dictionary<string, object> ToDict()
+        {
+            var d = new Dictionary<string, object>();
+            d["ligados"] = On; d["terminou"] = Done; d["erro"] = Error; d["esperando"] = Waiting;
+            d["som"] = Sound; d["minimoSegundos"] = MinSecs; d["naoPerturbeAte"] = QuietUntil;
+            return d;
+        }
+
+        public static NotifyCfg FromDict(Dictionary<string, object> d)
+        {
+            var n = new NotifyCfg();
+            if (d == null) return n;
+            n.On = Json.Bool(d, "ligados", true);
+            n.Done = Json.Bool(d, "terminou", true);
+            n.Error = Json.Bool(d, "erro", true);
+            n.Waiting = Json.Bool(d, "esperando", true);
+            n.Sound = Json.Bool(d, "som", false);
+            n.MinSecs = Math.Max(0, Math.Min(3600, Json.Int(d, "minimoSegundos", 30)));
+            double q;
+            n.QuietUntil = double.TryParse(Json.Str(d, "naoPerturbeAte", "0"), NumberStyles.Float, CultureInfo.InvariantCulture, out q) ? q : 0;
+            return n;
+        }
+    }
+
     sealed class Cfg
     {
         public string Corner = "direito";
         public bool Events = true;
+        public bool Taskbar = true;       // Clawds em cima da barra de tarefas (fora da Home)
+        public bool CheckUpdates = true;  // procurar versão nova no GitHub
+        public string SkipVersion = "";   // versão que a pessoa mandou ignorar
+        public NotifyCfg Notify = new NotifyCfg();
         public bool IsNew;   // ainda não há config.json: quem leu deve gravar
         public readonly List<AccountCfg> Accounts = new List<AccountCfg>();
         // O Gist por onde chegam as sessões de fora deste PC (nuvem, outros computadores).
@@ -648,6 +678,11 @@ namespace ClawdDesktop
             {
                 c.Corner = Json.Str(d, "canto", "direito") == "esquerdo" ? "esquerdo" : "direito";
                 c.Events = Json.Bool(d, "eventos", true);
+                c.Taskbar = Json.Bool(d, "barra", true);
+                c.Notify = NotifyCfg.FromDict(Json.Obj(d, "avisos"));
+                var up = Json.Obj(d, "atualizacoes");
+                c.CheckUpdates = Json.Bool(up, "procurar", true);
+                c.SkipVersion = Json.Str(up, "ignorar", "");
                 foreach (object o in Json.Arr(d, "contas"))
                 {
                     var x = o as Dictionary<string, object>;
@@ -676,6 +711,12 @@ namespace ClawdDesktop
             d["versao"] = 1;
             d["canto"] = Corner;
             d["eventos"] = Events;
+            d["barra"] = Taskbar;
+            d["avisos"] = Notify.ToDict();
+            var up = new Dictionary<string, object>();
+            up["procurar"] = CheckUpdates;
+            up["ignorar"] = SkipVersion;
+            d["atualizacoes"] = up;
             d["contas"] = Accounts.Select(a => (object)a.ToDict()).ToList();
             Directory.CreateDirectory(Dir);
             string tmp = FilePath + ".tmp";

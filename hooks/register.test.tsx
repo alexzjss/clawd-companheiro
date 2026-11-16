@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { accountOf, animFor, detailFor, greetingFor, moodOf, sceneSvg, spinnerAnim } from './register'
+import { accountOf, animFor, countTool, detailFor, greetingFor, moodOf, sceneSvg, spinnerAnim } from './register'
 import { relayDue, relayFile, relayFrom, relayKey, relayPayload, staleFiles, withHold } from './relay'
 import { customTheme, surfaces } from './themes'
 import { ANIMS, PALETTES, animForTool, clawdSvg } from './sprites'
@@ -124,6 +124,25 @@ test('limites e sessão vão para a pasta que o Clawd do Windows lê', async ($,
   expect(sessao.account).toBe('claude')
   expect(sessao.costUsd).toBe(1.25)
   expect(sessao.contextPercent).toBe(12)
+  expect(sessao.busyMs).toBe(0)
+  expect(sessao.done).toBe(0)
+  expect(sessao.tools).toBeUndefined()
+})
+
+test('as ferramentas são contadas pelo nome e pela categoria, nunca pelo conteúdo', () => {
+  let tools: Record<string, number> = {}
+  tools = countTool(tools, 'Bash', detailFor('Bash', { command: 'git push origin main' }))
+  tools = countTool(tools, 'Bash', detailFor('Bash', { command: 'git status' }))
+  tools = countTool(tools, 'Edit', detailFor('Edit', { file_path: 'C:/segredo/app.ts' }))
+  tools = countTool(tools, 'WebSearch', undefined)
+  expect(tools).toEqual({ 'Bash:git': 2, 'Edit:codigo': 1, WebSearch: 1 })
+  expect(JSON.stringify(tools).includes('segredo')).toBe(false)
+
+  // Um teto de chaves, para o arquivo da sessão não crescer sem fim.
+  let many: Record<string, number> = {}
+  for (let i = 0; i < 200; i++) many = countTool(many, `mcp__x__t${i}`, undefined)
+  expect(Object.keys(many).length).toBe(80)
+  expect(countTool(many, 'mcp__x__t0', undefined)['mcp__x__t0']).toBe(2)
 })
 
 test('o tipo do comando ou do arquivo vira detalhe, sem o texto dele', () => {

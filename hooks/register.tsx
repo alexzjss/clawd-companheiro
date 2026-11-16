@@ -250,6 +250,10 @@ const st = {
   contas: CONTAS_PADRAO,
   themeKey: '',
   ticks: 0,
+  tools: {} as Record<string, number>,
+  busyMs: 0,
+  done: 0,
+  failed: 0,
   // o envio para o Gist (sessões fora do PC dos Clawds)
   email: '',
   relay: undefined as Relay | undefined,
@@ -259,6 +263,18 @@ const st = {
   relayKey: '',
   relayBusy: false,
   relayPruned: false,
+}
+
+// Quantas chaves de ferramenta a sessão guarda, no máximo (cada MCP tem as suas).
+const MAX_TOOL_KEYS = 80
+
+// Conta uma chamada de ferramenta para as estatísticas da Central: só o nome da ferramenta
+// e a categoria (git, código...), como no resto do arquivo da sessão.
+export function countTool(tools: Record<string, number>, tool: string, detail: string | undefined): Record<string, number> {
+  const key = detail !== undefined ? `${tool}:${detail}` : tool
+  if (tools[key] === undefined && Object.keys(tools).length >= MAX_TOOL_KEYS) return tools
+
+  return { ...tools, [key]: (tools[key] ?? 0) + 1 }
 }
 
 const AGENT_FRESH_MS = 20_000
@@ -311,6 +327,8 @@ async function writeSession($: E, force: boolean) {
     turns: st.turns, turnStartedAt: st.turnStartedAt,
     ...(st.costUsd !== undefined ? { costUsd: st.costUsd } : {}),
     ...(st.contextPercent !== undefined ? { contextPercent: st.contextPercent } : {}),
+    ...(Object.keys(st.tools).length > 0 ? { tools: st.tools } : {}),
+    busyMs: st.busyMs, done: st.done, failed: st.failed,
   }
   st.relayInfo = info
   if (st.dir === '') return
@@ -497,6 +515,7 @@ async function notePrompt($: E, text: string) {
 async function noteToolStart($: E, tool: string, input: Record<string, unknown>, agentId: string | undefined) {
   const now = await $.clock.now()
   st.lastActive = now
+  if (st.turnActive || agentId !== undefined) st.tools = countTool(st.tools, tool, detailFor(tool, input))
   if (agentId !== undefined) {
     // Um subagente trabalhando: o Clawd ganha ajudantes, mas segue na tarefa dele.
     const isNew = st.agents[agentId] === undefined
@@ -541,6 +560,7 @@ export const register: Register = on => {
     turnActive: false, lastWrite: 0, dir: '', memory: emptyMemory(0), ended: false,
     turns: 0, turnStartedAt: 0, costUsd: undefined, contextPercent: undefined,
     agents: {}, lastAgents: 0, model: '', contas: CONTAS_PADRAO, themeKey: '', ticks: 0,
+    tools: {}, busyMs: 0, done: 0, failed: 0,
     email: '', relay: undefined, relayInfo: undefined, relayHold: undefined, relayLast: 0, relayKey: '',
     relayBusy: false, relayPruned: false,
   })
@@ -668,6 +688,9 @@ export const register: Register = on => {
       st.turns += 1
       const now = await $.clock.now()
       st.lastActive = now
+      if (st.turnStartedAt > 0) st.busyMs += Math.max(0, now - st.turnStartedAt)
+      if (e.reason === 'answer') st.done += 1
+      else if (e.reason !== 'aborted' && e.reason !== 'refusal') st.failed += 1
       const today = dayKey(now)
       const base = st.memory.today === today ? st.memory : { ...st.memory, today, tasksToday: 0 }
       if (e.reason === 'answer') {

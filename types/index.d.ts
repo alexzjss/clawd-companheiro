@@ -54,6 +54,13 @@ export type SessionInfo = {
   agents?: number
   /** O modelo do último passo do turno. */
   model?: string
+  /** Chamadas de ferramenta na sessão, por "Ferramenta" ou "Ferramenta:categoria" (nunca o comando ou o caminho). */
+  tools?: Record<string, number>
+  /** Tempo somado dos turnos já terminados, em ms. */
+  busyMs?: number
+  /** Turnos que terminaram com resposta e com erro. */
+  done?: number
+  failed?: number
   /** Só nas sessões que chegam pelo Gist: de onde vêm. */
   origin?: SessionOrigin
   /** Só nas sessões que chegam pelo Gist: o e-mail da conta, para o Desktop achar a conta. */
