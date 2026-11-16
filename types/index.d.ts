@@ -16,6 +16,9 @@ export type ActivityKind =
 
 export type Activity = { kind: ActivityKind; tool?: string; detail?: string; since: number; line?: string }
 
+/** De onde vem uma sessão que não está no PC dos Clawds: a nuvem do claude.ai ou outro computador. */
+export type SessionOrigin = 'nuvem' | 'outro'
+
 export type Mood = 'feliz' | 'tranquilo' | 'triste' | 'sonolento'
 
 export type Memory = {
@@ -58,6 +61,10 @@ export type SessionInfo = {
   /** Turnos que terminaram com resposta e com erro. */
   done?: number
   failed?: number
+  /** Só nas sessões que chegam pelo Gist: de onde vêm. */
+  origin?: SessionOrigin
+  /** Só nas sessões que chegam pelo Gist: o e-mail da conta, para o Desktop achar a conta. */
+  email?: string
 }
 
 declare module 'claude-code' {

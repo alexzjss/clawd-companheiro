@@ -582,10 +582,36 @@ namespace ClawdDesktop
         public NotifyCfg Notify = new NotifyCfg();
         public bool IsNew;   // ainda não há config.json: quem leu deve gravar
         public readonly List<AccountCfg> Accounts = new List<AccountCfg>();
+        // O Gist por onde chegam as sessões de fora deste PC (nuvem, outros computadores).
+        // Fica em nuvem.json, longe da config que o mod lê, porque leva o token.
+        public string GistId = "", GistToken = "";
 
         public static string Dir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "clawd"); } }
         public static string FilePath { get { return Path.Combine(Dir, "config.json"); } }
         public static string SkinsDir { get { return Path.Combine(Dir, "skins"); } }
+        public static string RelayPath { get { return Path.Combine(Dir, "nuvem.json"); } }
+
+        public bool HasRelay { get { return Regex.IsMatch(GistId ?? "", "^[0-9a-fA-F]{20,40}$"); } }
+
+        // A conta de um e-mail, pelas mesmas regras do mod (accountOf em hooks/register.tsx):
+        // domínios (empresa.com vale para ti.empresa.com) ou e-mails inteiros; "*" fica com o resto.
+        public string AccountFor(string email)
+        {
+            string mail = (email ?? "").Trim().ToLowerInvariant();
+            if (mail.Length == 0) return "outra";
+            string rest = null;
+            foreach (var a in Accounts)
+            {
+                foreach (string raw in (a.Emails ?? "").ToLowerInvariant().Split(new[] { ' ', ',', ';', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (raw == "*") { if (rest == null) rest = a.Key; continue; }
+                    string domain = raw.TrimStart('@');
+                    bool whole = raw.Contains("@") && !raw.StartsWith("@");
+                    if (whole ? mail == raw : mail.EndsWith("@" + domain) || mail.EndsWith("." + domain)) return a.Key;
+                }
+            }
+            return rest ?? "outra";
+        }
 
         // Cores de partida para contas novas, em rodízio: principal, detalhe.
         public static readonly string[][] Starters =
@@ -665,6 +691,9 @@ namespace ClawdDesktop
                     if (a.Key.Length > 0 && Regex.IsMatch(a.Key, "^[a-z0-9-]{1,40}$") && !c.Accounts.Any(y => y.Key == a.Key)) c.Accounts.Add(a);
                 }
             }
+            var relay = Json.Read(RelayPath);
+            c.GistId = Json.Str(relay, "gist", "").Trim();
+            c.GistToken = Json.Str(relay, "token", "").Trim();
             var profiles = Profiles.List();
             c.Accounts.RemoveAll(a => !profiles.Any(p => p.Id == a.Profile));
             foreach (var p in profiles)
@@ -695,6 +724,19 @@ namespace ClawdDesktop
             // troca de uma vez, para ninguém ler o arquivo pela metade
             if (File.Exists(FilePath)) File.Replace(tmp, FilePath, null);
             else File.Move(tmp, FilePath);
+            SaveRelay();
+        }
+
+        void SaveRelay()
+        {
+            if (GistId.Length == 0 && GistToken.Length == 0) { if (File.Exists(RelayPath)) File.Delete(RelayPath); return; }
+            var d = new Dictionary<string, object>();
+            d["gist"] = GistId;
+            d["token"] = GistToken;
+            string tmp = RelayPath + ".tmp";
+            File.WriteAllText(tmp, Json.Write(d) + "\n", new UTF8Encoding(false));
+            if (File.Exists(RelayPath)) File.Replace(tmp, RelayPath, null);
+            else File.Move(tmp, RelayPath);
         }
 
         public static DateTime Stamp()

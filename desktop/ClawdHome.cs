@@ -129,6 +129,7 @@ namespace ClawdDesktop
             what.Margin = new Thickness(0, 0, 0, 12);
             detailBody.Children.Add(what);
 
+            if (s.IsRemote) Row("Onde", s.Origin == "nuvem" ? "na nuvem do claude.ai" : "em outro computador");
             string model = Ui.ModelName(s.Model);
             if (model.Length > 0) Row("Modelo", model);
             if (s.Agents > 0) Row("Subagentes", ((int)s.Agents).ToString());

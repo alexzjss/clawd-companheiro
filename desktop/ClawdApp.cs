@@ -409,7 +409,7 @@ namespace ClawdDesktop
             settings.Refresh();
         }
 
-        public bool Busy { get { return accounts.Busy; } }
+        public bool Busy { get { return accounts.Busy || settings.Busy; } }
         public bool HomeVisible { get { return page == "home" && IsVisible && WindowState != WindowState.Minimized && IsActive; } }
 
         void BuildNav()
@@ -536,8 +536,19 @@ namespace ClawdDesktop
 
         void Changed() { app.Changed(); }
 
+        // Alguém digitando aqui (o Gist ou o token): não redesenha embaixo.
+        public bool Busy
+        {
+            get
+            {
+                var f = Keyboard.FocusedElement as DependencyObject;
+                return (f is TextBox || f is PasswordBox) && IsAncestorOf(f);
+            }
+        }
+
         public void Refresh()
         {
+            if (Busy) return;
             var c = app.Cfg;
             var sp = new StackPanel();
 
@@ -587,6 +598,9 @@ namespace ClawdDesktop
             // ---- mod
             sp.Children.Add(Ui.Section("Mod do Claude Code", "É o mod que conta para o app o que cada sessão está fazendo, aplica o tema de cada conta e põe um Clawd dentro do Claude.", BuildMod()));
 
+            // ---- sessões de fora deste PC
+            sp.Children.Add(Ui.Section("Nuvem e outros PCs", "Sessões na nuvem do claude.ai (app, web, celular, tarefas agendadas) e em outros computadores também aparecem, com uma nuvenzinha. Elas mandam o estado para um Gist secreto do GitHub, e o app lê de lá a cada 15 segundos.", BuildRelay(c)));
+
             // ---- inicialização e atualizações
             var sys = new StackPanel();
             bool startup = AppPaths.StartsWithWindows;
@@ -611,6 +625,76 @@ namespace ClawdDesktop
             sp.Children.Add(Ui.Section("Dados e privacidade", "Tudo fica nesta máquina, em .claude\\clawd: as escolhas, o histórico e o estado das sessões (nunca os comandos, caminhos ou conteúdo). Nada é enviado para fora, além da consulta de versão nova no GitHub.", data));
 
             Content = sp;
+        }
+
+        // Aceita o ID ou o endereço inteiro do Gist (gist.github.com/usuario/<id>).
+        static string GistIdOf(string text)
+        {
+            string t = (text ?? "").Trim().TrimEnd('/');
+            int slash = t.LastIndexOf('/');
+            if (slash >= 0) t = t.Substring(slash + 1);
+            int hash = t.IndexOf('#');
+            if (hash >= 0) t = t.Substring(0, hash);
+            return t;
+        }
+
+        static TextBlock Para(string text)
+        {
+            var t = Ui.T(text, 12.5, Ui.Dim, false);
+            t.Margin = new Thickness(0, 0, 0, 8);
+            return t;
+        }
+
+        static TextBox CodeBox(string text)
+        {
+            return new TextBox
+            {
+                Text = text, IsReadOnly = true, FontFamily = Ui.Mono, FontSize = 12.5, Padding = new Thickness(8, 5, 8, 5),
+                Background = Ui.Soft, Foreground = Ui.Text, BorderBrush = Ui.Line, Margin = new Thickness(0, 0, 0, 8),
+                HorizontalAlignment = HorizontalAlignment.Left, MinWidth = 320, TextWrapping = TextWrapping.Wrap,
+            };
+        }
+
+        UIElement BuildRelay(Cfg c)
+        {
+            var sp = new StackPanel();
+            sp.Children.Add(Para("1. Crie um Gist secreto com qualquer arquivo (por exemplo LEIA-ME.md) e cole aqui o endereço ou o ID dele."));
+            var idBox = new TextBox { Text = c.GistId, FontFamily = Ui.Mono, FontSize = 13, Padding = new Thickness(10, 7, 10, 7), Background = Ui.Soft, Foreground = Ui.Text, CaretBrush = Ui.Text, BorderBrush = Ui.Line, MinWidth = 320, MaxWidth = 460, HorizontalAlignment = HorizontalAlignment.Left };
+            var idWarn = Ui.T("", 12, Ui.Warn, false);
+            idWarn.Margin = new Thickness(0, 6, 0, 10);
+            Action checkId = delegate
+            {
+                bool bad = c.GistId.Length > 0 && !c.HasRelay;
+                idWarn.Text = bad ? "Isso não parece o ID de um Gist (letras de a a f e números)." : "";
+                idWarn.Visibility = bad ? Visibility.Visible : Visibility.Collapsed;
+            };
+            idBox.TextChanged += delegate { c.GistId = GistIdOf(idBox.Text); checkId(); Changed(); };
+            sp.Children.Add(idBox);
+            sp.Children.Add(idWarn);
+            checkId();
+            sp.Children.Add(Para("2. Crie um token do GitHub só com a permissão \"gist\" e cole aqui. Ele fica em nuvem.json, nesta máquina, e serve para o app ler o Gist sem esbarrar no limite do GitHub."));
+            var tok = new PasswordBox { Password = c.GistToken, FontFamily = Ui.Mono, FontSize = 13, Padding = new Thickness(10, 7, 10, 7), Background = Ui.Soft, Foreground = Ui.Text, CaretBrush = Ui.Text, BorderBrush = Ui.Line, MinWidth = 320, MaxWidth = 460, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 10) };
+            tok.PasswordChanged += delegate { c.GistToken = tok.Password.Trim(); Changed(); };
+            sp.Children.Add(tok);
+            var links = new WrapPanel { Margin = new Thickness(0, 0, 0, 14) };
+            links.Children.Add(Ui.Button(Ui.IcOpen, "Criar o Gist", null, delegate { Open("https://gist.github.com/"); }));
+            links.Children.Add(Ui.Button(Ui.IcOpen, "Criar o token", null, delegate { Open("https://github.com/settings/tokens/new?scopes=gist&description=Clawd%20Companheiro"); }));
+            sp.Children.Add(links);
+            sp.Children.Add(Para("Secreto não quer dizer trancado: quem tiver o endereço lê. Vão para lá o assunto de cada sessão, o nome da pasta, o estado, o modelo e o e-mail da conta, nunca comandos, caminhos ou conteúdo."));
+
+            string id = c.HasRelay ? c.GistId : "<id do gist>";
+            var cloud = Ui.T("Na nuvem", 13.5, Ui.Text, true);
+            cloud.Margin = new Thickness(0, 10, 0, 6);
+            sp.Children.Add(cloud);
+            sp.Children.Add(Para("No ambiente da nuvem que as sessões usam (claude.ai/code, Configurações do ambiente): a variável abaixo, a rede com api.github.com liberado e um segredo de rede para api.github.com com o token (cabeçalho Authorization: Bearer), para o token não ficar dentro do container. O mod precisa estar ligado nessas sessões."));
+            sp.Children.Add(CodeBox("CLAWD_GIST_ID=" + id));
+            var other = Ui.T("Em outro computador", 13.5, Ui.Text, true);
+            other.Margin = new Thickness(0, 10, 0, 6);
+            sp.Children.Add(other);
+            sp.Children.Add(Para("Num computador sem o app (Mac, Linux, outro Windows), com o mod instalado no Claude Code, defina antes de abrir o Claude:"));
+            sp.Children.Add(CodeBox("CLAWD_GIST_ID=" + id + "\nCLAWD_GITHUB_TOKEN=<o token>"));
+            sp.Children.Add(Para("Num Windows que também tem o app, as sessões só aparecem nele; para mandar ao Gist mesmo assim, defina CLAWD_RELAY=1. CLAWD_RELAY=0 desliga o envio em qualquer máquina."));
+            return sp;
         }
 
         static void Open(string what)

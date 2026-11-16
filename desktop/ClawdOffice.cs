@@ -778,7 +778,8 @@ namespace ClawdDesktop
             // nome da sessão
             if (d.S != null)
             {
-                var ft = Txt(d.S.Label, 10.5, active ? TextDim : TextFaint, false, c.Width - 12);
+                string where = d.S.Origin == "nuvem" ? "\u2601 " : d.S.Origin == "outro" ? "\u21C4 " : "";
+                var ft = Txt(where + d.S.Label, 10.5, active ? TextDim : TextFaint, false, c.Width - 12);
                 dc.DrawText(ft, new Point(Math.Round(x + (c.Width - ft.Width) / 2), y + 86));
             }
         }

@@ -104,6 +104,19 @@ Passe o mouse num Clawd da barra para ver as sessões da conta, os limites de us
 
 Clique faz carinho, duplo clique abre o Claude da conta, arrastar levanta o Clawd e o botão direito abre o menu. Para ver tudo sem esperar, `Clawd.exe --demo` passa pelos estados e `--eventos` pelas brincadeiras.
 
+## Sessões de fora deste PC
+
+Sessões na nuvem do claude.ai (abertas pelo app, pela web, pelo celular ou por tarefas agendadas) e sessões em outros computadores também aparecem: viram filhotes do Clawd da conta, com uma nuvenzinha, e no painel ficam marcadas com ☁ (nuvem) ou ⇄ (outro computador). O Clawd grande continua com uma sessão deste PC quando houver uma.
+
+Como elas não gravam no seu disco, mandam o estado para um **Gist secreto do GitHub**, e os Clawds leem de lá. Para ligar:
+
+1. Crie um Gist secreto com qualquer arquivo e um token do GitHub só com a permissão `gist`.
+2. No app, em **Configurações → Nuvem e outros PCs**, cole o endereço do Gist e o token.
+3. No ambiente da nuvem (claude.ai/code, configurações do ambiente): a variável `CLAWD_GIST_ID=<id>`, o host `api.github.com` liberado na rede e um segredo de rede para `api.github.com` com o token. O mod precisa estar ligado nas sessões da nuvem.
+4. Num outro computador com o mod: `CLAWD_GIST_ID` e `CLAWD_GITHUB_TOKEN` no ambiente antes de abrir o Claude.
+
+Uma sessão só manda para o Gist quando roda na nuvem ou numa máquina sem o ClawdDesktop instalado; `CLAWD_RELAY=1` força o envio e `CLAWD_RELAY=0` desliga. Cada sessão manda no máximo a cada 20 segundos (o GitHub limita as escritas), e os Clawds leem a cada 15 segundos, então o que acontece lá aparece aqui com até meio minuto de atraso. Sessões de mais de um dia saem do Gist sozinhas.
+
 ## Criar skins
 
 Cada `.json` em `~/.claude/clawd/skins/` vira uma skin no app (há um exemplo em [`skins/`](skins/)). Uma skin é uma lista de peças de pixel art presas a um ponto do corpo:
@@ -128,11 +141,13 @@ O corpo tem 16 pixels de largura (x de -8 a 7) e 9 de altura. As skins de fábri
 
 Tudo fica na sua máquina, em `~/.claude/clawd/`. O mod grava ali só o estado de cada sessão, a categoria do que ela faz (por exemplo "git" ou "código") e quantas vezes usou cada ferramenta, nunca o comando, o caminho ou o conteúdo. O histórico das estatísticas guarda só somas por dia e por conta. A única coisa que sai da máquina é a consulta de versão nova à API do GitHub, que dá para desligar em Configurações.
 
+A exceção é o Gist das [sessões de fora deste PC](#sessões-de-fora-deste-pc), que só existe se você configurar. Para lá vai o mesmo estado, mais o assunto da sessão, o nome da pasta (sem o caminho) e o e-mail da conta, que é como os Clawds descobrem de qual conta ela é. Um Gist secreto não é trancado: quem tiver o endereço consegue ler. O token fica em `~/.claude/clawd/nuvem.json`, separado da config.
+
 ## Desenvolver
 
 ```
 VERSION             a versão de tudo (o plugin.json precisa estar igual)
-hooks/              o mod (TypeScript): register.tsx, themes.ts, sprites.ts
+hooks/              o mod (TypeScript): register.tsx, relay.ts (envio ao Gist), themes.ts, sprites.ts
 types/              o contrato de estado do mod
 desktop/            o app (C# 5, WPF, sem dependências)
   ClawdApp.cs         início, bandeja, janela e Configurações

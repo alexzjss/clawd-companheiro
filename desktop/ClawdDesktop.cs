@@ -9,6 +9,9 @@
 //   uso-<conta>.json       limites de uso da conta
 // e avisa o app a cada leitura (SessionsRead), para a Home, os avisos e o histórico.
 //
+// Sessões de fora deste PC (na nuvem do claude.ai ou em outro computador) chegam por um Gist
+// privado do GitHub, configurado nas Configurações do app; viram filhotes com uma nuvenzinha.
+//
 // O Clawd grande é a sessão mais antiga aberta na conta; cada outra sessão ativa vira um
 // filhote. Passar o mouse: painel curto com sessões, limites e custo. Clique: carinho.
 // Duplo clique: abre o Claude da conta. Arrastar: ele balança e cai. Botão direito: menu.
@@ -22,6 +25,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -96,12 +100,14 @@ namespace ClawdDesktop
     sealed class SessionView
     {
         public string Id, Account, Label, State, Tool, Detail, Model;
+        public string Origin = "", Email = "";   // só nas que chegam pelo Gist
         public double StartedAt, UpdatedAt, EndedAt, TurnStartedAt, Turns, Agents;
         public double Cost = double.NaN, Ctx = double.NaN;
         public double BusyMs = double.NaN, Done = double.NaN, Failed = double.NaN;
         public Dictionary<string, double> Tools;   // "Bash:git" -> chamadas (mods antigos não mandam)
 
         public bool IsActive(double nowMs) { return EndedAt <= 0 && nowMs - UpdatedAt < 180000; }
+        public bool IsRemote { get { return Origin.Length > 0; } }
 
         public static SessionView From(Dictionary<string, object> d)
         {
@@ -133,6 +139,8 @@ namespace ClawdDesktop
                 s.Tools = new Dictionary<string, double>();
                 foreach (var kv in td.Take(200)) s.Tools[kv.Key] = Data.Num(td, kv.Key, 0);
             }
+            s.Origin = Data.Str(d, "origin", "");
+            s.Email = Data.Str(d, "email", "");
             return s;
         }
     }
@@ -218,6 +226,115 @@ namespace ClawdDesktop
                 }
             }
             return u;
+        }
+    }
+
+    // Lê o Gist por onde as sessões de fora deste PC mandam o estado. Roda numa thread só dela;
+    // a tela pega a última leitura boa com Snapshot().
+    sealed class Nuvem
+    {
+        // Com token, uma leitura a cada 15 s: 240 por hora, longe do limite do GitHub (5000).
+        // Sem token o limite é 60 por hora, então uma a cada 90 s.
+        const int EveryMs = 15000, NoTokenMs = 90000;
+        readonly object gate = new object();
+        string gist = "", token = "";
+        string etag;
+        List<Dictionary<string, object>> last = new List<Dictionary<string, object>>();
+        public volatile string Status = "";
+        static readonly JavaScriptSerializer Ser = new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024 };
+
+        public void Configure(string gistId, string tok)
+        {
+            lock (gate)
+            {
+                if (gistId == gist && tok == token) return;
+                gist = gistId ?? ""; token = tok ?? ""; etag = null;
+                last = new List<Dictionary<string, object>>();
+                Status = "";
+            }
+        }
+
+        public List<Dictionary<string, object>> Snapshot() { lock (gate) return last; }
+
+        public void Start()
+        {
+            // O .NET 4 não liga o TLS 1.2 sozinho, e o GitHub só aceita ele.
+            try { ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; } catch { }
+            new Thread(Loop) { IsBackground = true, Name = "clawd-nuvem" }.Start();
+        }
+
+        void Loop()
+        {
+            while (true)
+            {
+                int wait = EveryMs;
+                try { wait = Once(); }
+                catch (Exception e) { Status = "sem conexão com o GitHub"; Program.Log("nuvem: " + e.Message); }
+                Thread.Sleep(wait);
+            }
+        }
+
+        int Once()
+        {
+            string id, tok, tag;
+            lock (gate) { id = gist; tok = token; tag = etag; }
+            if (id.Length == 0) return EveryMs;
+            int every = tok.Length > 0 ? EveryMs : NoTokenMs;
+            var req = (HttpWebRequest)WebRequest.Create("https://api.github.com/gists/" + id);
+            req.UserAgent = "clawd-companheiro";
+            req.Accept = "application/vnd.github+json";
+            req.Headers["X-GitHub-Api-Version"] = "2022-11-28";
+            if (tok.Length > 0) req.Headers["Authorization"] = "Bearer " + tok;
+            if (tag != null) req.Headers["If-None-Match"] = tag;
+            req.Timeout = 12000;
+            HttpWebResponse res;
+            try { res = (HttpWebResponse)req.GetResponse(); }
+            catch (WebException e)
+            {
+                var r = e.Response as HttpWebResponse;
+                if (r == null) throw;
+                int code = (int)r.StatusCode;
+                r.Close();
+                if (code == 304) { Status = "ok"; return every; }   // nada mudou (e não gasta o limite)
+                Status = code == 404 ? "Gist não encontrado" : code == 401 ? "token recusado" : "o GitHub respondeu " + code;
+                // limite estourado: espera mais
+                return code == 403 || code == 429 ? 5 * 60000 : 60000;
+            }
+            string text, newTag;
+            using (res)
+            using (var sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8))
+            {
+                newTag = res.Headers["ETag"];
+                text = sr.ReadToEnd();
+            }
+            var list = new List<Dictionary<string, object>>();
+            var root = Ser.DeserializeObject(text) as Dictionary<string, object>;
+            object filesObj;
+            var files = root != null && root.TryGetValue("files", out filesObj) ? filesObj as Dictionary<string, object> : null;
+            if (files != null)
+            {
+                foreach (var kv in files)
+                {
+                    if (!kv.Key.StartsWith("sessao-") || !kv.Key.EndsWith(".json")) continue;
+                    var f = kv.Value as Dictionary<string, object>;
+                    string content = Data.Str(f, "content", null);
+                    if (content == null) continue;
+                    try
+                    {
+                        var d = Ser.DeserializeObject(content) as Dictionary<string, object>;
+                        if (d != null) list.Add(d);
+                    }
+                    catch { }
+                }
+            }
+            lock (gate)
+            {
+                if (id != gist) return 0;   // trocaram o Gist no meio: lê o novo já
+                last = list;
+                etag = newTag;
+            }
+            Status = "ok";
+            return every;
         }
     }
 
@@ -413,6 +530,7 @@ namespace ClawdDesktop
         public string State = "ocioso", Tool = "", Detail = "", Model = "", LastWorkAnim = "";
         public double Agents, Ctx = double.NaN, TurnStartedAt;
         public bool Trophy;
+        public bool Remote;   // a sessão vem de fora deste PC: ganha a nuvenzinha
         public string BubbleText;
         public double BubbleUntil, BubbleFrom;
         public string PendingText;
@@ -497,6 +615,7 @@ namespace ClawdDesktop
         bool demo, festa;
         readonly bool photo;   // fotos do README: tempo e contas de mentira, sem janela
         readonly string shared, sessionsDir;
+        readonly Nuvem nuvem = new Nuvem();
         string corner = "direito";
         Cfg cfg;
         DateTime cfgStamp;
@@ -573,6 +692,7 @@ namespace ClawdDesktop
 
             if (photo) return;
             new Thread(WatchProcesses) { IsBackground = true, Name = "claude-watch" }.Start();
+            if (!demo) nuvem.Start();
 
             var frame = new DispatcherTimer(DispatcherPriority.Render);
             frame.Interval = TimeSpan.FromMilliseconds(33);
@@ -594,6 +714,7 @@ namespace ClawdDesktop
             if (cfg.IsNew && !photo) { try { cfg.Save(); } catch { } }
             cfgStamp = Cfg.Stamp();
             corner = cfg.Corner;
+            nuvem.Configure(cfg.HasRelay ? cfg.GistId : "", cfg.GistToken);
             var skins = photo ? Skin.Builtin() : Skin.LoadAll(Cfg.SkinsDir);
             var next = new List<Account>();
             foreach (var ac in cfg.Accounts)
@@ -737,13 +858,25 @@ namespace ClawdDesktop
                     all.Add(s);
                     if (by.ContainsKey(s.Account)) by[s.Account].Add(s);
                 }
+                // as de fora deste PC; a conta sai do e-mail, pelas regras da Central
+                foreach (var d in nuvem.Snapshot())
+                {
+                    var s = SessionView.From(d);
+                    if (s == null || now - s.UpdatedAt > 86400000) continue;
+                    if (s.Origin.Length == 0) s.Origin = "outro";
+                    if (s.Email.Length > 0) s.Account = cfg.AccountFor(s.Email);
+                    if (!all.Any(x => x.Id == s.Id)) all.Add(s);
+                    List<SessionView> list;
+                    if (by.TryGetValue(s.Account, out list) && !list.Any(x => x.Id == s.Id)) list.Add(s);
+                }
             }
 
             foreach (var a in accounts)
             {
                 a.Running = demo || running.ContainsKey(a.Profile);
                 a.Sessions = by[a.Key].OrderByDescending(s => s.IsActive(now)).ThenByDescending(s => s.UpdatedAt).ToList();
-                a.Active = by[a.Key].Where(s => s.IsActive(now)).OrderBy(s => s.StartedAt).ToList();
+                // o Clawd grande fica com uma sessão deste PC quando há; as de fora vêm depois
+                a.Active = by[a.Key].Where(s => s.IsActive(now)).OrderBy(s => s.IsRemote ? 1 : 0).ThenBy(s => s.StartedAt).ToList();
                 if (!demo)
                 {
                     a.Memory = Data.Read(System.IO.Path.Combine(shared, "memoria-" + a.Key + ".json"));
@@ -859,6 +992,7 @@ namespace ClawdDesktop
             c.Agents = s != null ? s.Agents : 0;
             c.Ctx = s != null ? s.Ctx : double.NaN;
             c.TurnStartedAt = s != null ? s.TurnStartedAt : 0;
+            c.Remote = s != null && s.IsRemote;
             if (c == drag || c.Falling) return;
             if (c.State == old) { if (c.State == "trabalhando") SayWork(c, t); return; }
             switch (c.State)
@@ -2700,6 +2834,7 @@ namespace ClawdDesktop
             if (p.Puff > 0 && !double.IsNaN(c.Ctx) && c.Ctx >= 85) g.Stamp(Art.Drop, geo.X1 - 1, geo.Top - 2);
             DrawFront(c, g, p, geo, t, tl);
             if (c.Agents > 0) DrawHelpers(g, (int)Math.Min(4, c.Agents), t);
+            if (c.Remote) g.Stamp(Art.Cloud, geo.X0 - 7, geo.Top - 6 - (F(t, 1.2, 2) == 0 ? 0 : 1));
         }
 
         // Ajudantes: um robozinho por subagente, saltitando atrás do Clawd.
@@ -3396,6 +3531,12 @@ namespace ClawdDesktop
             Run(3.4);
             Snap(at("filhotes"), null);
             Snap(at("painel"), accounts[0]);
+            var cloud = Fake(a, "a3", 1, "trabalhando", "Bash", "teste", "claude-opus-5-5", "Rodar a suíte na nuvem", 0);
+            cloud.Origin = "nuvem";
+            Scene(Fake(a, "a1", 3, "trabalhando", "Edit", "codigo", "claude-opus-5-5", "Corrigir o login", 0), cloud,
+                  Fake(b, "b1", 2, "pensando", "", "", "claude-sonnet-5-5", "Site novo", 0));
+            Run(3.4);
+            Snap(at("nuvem"), null);
             Scene(Fake(b, "b1", 2, "encerrada", "", "", "", "Site novo", 0));
             Run(6);
             Snap(at("descansando"), null);
@@ -3554,7 +3695,9 @@ namespace ClawdDesktop
                 }
                 var d = new Rectangle { Width = 6, Height = 6, Fill = StateColor(s, now), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
                 row.Children.Add(d);
-                var label = Tx(s.Label, 11.5, s.IsActive(now) ? Text : Dim, false);
+                string where = s.Origin == "nuvem" ? "☁ " : s.Origin == "outro" ? "⇄ " : "";
+                var label = Tx(where + s.Label, 11.5, s.IsActive(now) ? Text : Dim, false);
+                if (s.IsRemote) label.ToolTip = s.Origin == "nuvem" ? "Sessão na nuvem do claude.ai" : "Sessão em outro computador";
                 label.Margin = new Thickness(0, 3, 8, 3);
                 Grid.SetColumn(label, 1);
                 row.Children.Add(label);

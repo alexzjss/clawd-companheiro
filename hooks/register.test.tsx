@@ -1,6 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import { accountOf, animFor, countTool, detailFor, greetingFor, moodOf, sceneSvg, spinnerAnim } from './register'
+import { relayDue, relayFile, relayFrom, relayKey, relayPayload, staleFiles, withHold } from './relay'
 import { customTheme, surfaces } from './themes'
 import { ANIMS, PALETTES, animForTool, clawdSvg } from './sprites'
 
@@ -218,4 +219,80 @@ test('todo SVG cabe no limite de 131072 caracteres', () => {
     expect(clawdSvg(name, PALETTES.laranja).length).toBeLessThan(131_072)
     expect(sceneSvg({ kind: 'oi', since: 0, line: 'Oi! Eu sou o Clawd. Vou ficar por aqui com você.' }, 'feliz', 'usp').length).toBeLessThan(131_072)
   }
+})
+
+test('só manda para o Gist quem está fora do PC dos Clawds', () => {
+  const gist = '0123456789abcdef0123'
+  expect(relayFrom({ gist, remote: 'true' }, false)?.origin).toBe('nuvem')
+  expect(relayFrom({ gist, remote: 'true' }, true)?.origin).toBe('nuvem')
+  expect(relayFrom({ gist }, false)?.origin).toBe('outro')
+  expect(relayFrom({ gist }, true)).toBeUndefined()
+  expect(relayFrom({ gist, force: '1' }, true)?.origin).toBe('outro')
+  expect(relayFrom({ gist, remote: 'true', force: '0' }, false)).toBeUndefined()
+  expect(relayFrom({ gist: 'não é um id', remote: 'true' }, false)).toBeUndefined()
+  expect(relayFrom({ remote: 'true' }, false)).toBeUndefined()
+  expect(relayFrom({ gist, token: ' ghp_x ', remote: 'true' }, false)?.token).toBe('ghp_x')
+
+  const info = { id: 'a/b', account: 'claude', label: 'x', cwd: '/home/user/projeto', state: 'ocioso' as const, startedAt: 1, updatedAt: 2 }
+  const out = relayPayload(info, 'nuvem', 'eu@usp.br')
+  expect(out.cwd).toBe('projeto')
+  expect(out.email).toBe('eu@usp.br')
+  expect(relayFile('a/b')).toBe('sessao-a_b.json')
+
+  // o "terminou" segura o lugar até ir, mas uma tarefa nova passa na frente
+  expect(withHold(info, { kind: 'feito', since: 1 }).state).toBe('feito')
+  expect(withHold({ ...info, state: 'pensando' }, { kind: 'feito', since: 1 }).state).toBe('pensando')
+
+  // ritmo: nunca antes de 20 s; depois, só se mudou ou a cada minuto; o fim vai sempre
+  const k = relayKey(info)
+  expect(relayKey({ ...info, updatedAt: 99 })).toBe(k)
+  expect(relayDue(10_000, 0, '', k, false)).toBe(false)
+  expect(relayDue(25_000, 0, 'outra', k, false)).toBe(true)
+  expect(relayDue(25_000, 0, k, k, false)).toBe(false)
+  expect(relayDue(61_000, 0, k, k, false)).toBe(true)
+  expect(relayDue(1_000, 0, k, k, true)).toBe(true)
+
+  const now = Date.UTC(2026, 10, 14, 15)
+  const files = {
+    'sessao-velha.json': { content: JSON.stringify({ updatedAt: now - 2 * 86_400_000 }) },
+    'sessao-nova.json': { content: JSON.stringify({ updatedAt: now - 60_000 }) },
+    'sessao-quebrada.json': { content: '{' },
+    'LEIA-ME.md': { content: 'x' },
+  }
+  expect(staleFiles(files, now, 'sessao-nova.json').sort()).toEqual(['sessao-quebrada.json', 'sessao-velha.json'])
+})
+
+test('na nuvem, a sessão vai para o Gist com a origem e o e-mail', async ($, on) => {
+  const sent: Array<{ url: string; method?: string; body?: string }> = []
+  mock.env(on, { CLAUDE_CODE_USER_EMAIL: 'eu@usp.br', HOME: '/root', CLAUDE_CODE_REMOTE: 'true', CLAWD_GIST_ID: '0123456789abcdef0123' })
+  mock.clock(on, { now: Date.UTC(2026, 10, 14, 15, 0, 0) })
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'theme' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.end', () => ({ sessionId: 'sessao-nuvem' }))
+  on('session.id', () => ({ value: 'sessao-nuvem' }))
+  on('command.register', () => ({ value: { command: 'clawd' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('fs.read', () => ({ value: '{}' }))
+  on('fs.list', () => ({ value: [] }))
+  on('fs.write', () => ({ value: undefined }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [] } }))
+  on('http.fetch', (_, e) => {
+    sent.push({ url: e.url, method: e.init?.method, body: typeof e.init?.body === 'string' ? e.init.body : undefined })
+    const old = { 'sessao-antiga.json': { content: JSON.stringify({ updatedAt: 0 }) } }
+
+    return { value: { status: 200, headers: {}, text: e.init?.method === 'GET' ? JSON.stringify({ files: old }) : '{}' } }
+  })
+  await $.session.start({ cwd: '/home/user/projeto', surface: 'desktop', isInteractive: true })
+  await $.session.end({ sessionId: 'sessao-nuvem', reason: 'other' } as never)
+
+  expect(sent.every(s => s.url === 'https://api.github.com/gists/0123456789abcdef0123')).toBe(true)
+  // primeiro limpa o Gist, depois manda a sessão
+  expect(sent[0]?.method).toBe('GET')
+  expect(JSON.parse(sent[1]?.body ?? '{}').files).toEqual({ 'sessao-antiga.json': null })
+  const last = JSON.parse(sent[sent.length - 1]?.body ?? '{}') as { files: Record<string, { content: string }> }
+  const info = JSON.parse(last.files['sessao-sessao-nuvem.json']?.content ?? '{}')
+  expect(info.origin).toBe('nuvem')
+  expect(info.email).toBe('eu@usp.br')
+  expect(info.cwd).toBe('projeto')
+  expect(info.endedAt).toBeDefined()
 })

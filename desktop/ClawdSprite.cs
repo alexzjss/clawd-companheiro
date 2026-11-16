@@ -102,6 +102,8 @@ namespace ClawdDesktop
         public static readonly string[] Check = { ".....n", "....nn", "n..nn.", "nnnn..", ".nn..." };
         public static readonly string[] Cross = { "rr...rr", ".rr.rr.", "..rrr..", ".rr.rr.", "rr...rr" };
         public static readonly string[] Drop = { ".c.", "ccc", "cwc", ".c." };
+        // A marca das sessões que vêm de fora deste PC (nuvem, outro computador).
+        public static readonly string[] Cloud = { "...kk...", ".kkwwkk.", "kwwwwwwk", "kwwwwggk", ".kkkkkk." };
         public static readonly string[] Paper = { "pp", "pq" };
         public static readonly string[] Cursor = { "k....", "kk...", "kwk..", "kwwk.", "kwwwk", "kwwkk", "k.kwk", "...k." };
         public static readonly string[] Thought =
