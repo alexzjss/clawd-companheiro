@@ -8,17 +8,17 @@ $app = Join-Path $env:USERPROFILE '.claude\clawd\app'
 $menu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
 $lnk = Join-Path $menu 'Clawdesk.lnk'
 $boot = Join-Path $menu 'Startup\Clawdesk.lnk'
-$old = @('Clawd.lnk', 'Central dos Clawds.lnk', 'Startup\Clawd.lnk') | ForEach-Object { Join-Path $menu $_ }
+$old = @('Clawd.lnk', 'Central dos Clawds.lnk', 'Startup\Clawd.lnk', 'Clawd Companheiro.lnk', 'Startup\Clawd Companheiro.lnk') | ForEach-Object { Join-Path $menu $_ }
 
-Get-Process Clawd, ClawdDesktop, ClawdCentral -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process Clawdesk, Clawd, ClawdDesktop, ClawdCentral -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 600
 foreach ($p in $old) { Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue }
-foreach ($exe in 'ClawdDesktop.exe', 'ClawdCentral.exe') { Remove-Item -LiteralPath (Join-Path $app $exe) -Force -ErrorAction SilentlyContinue }
+foreach ($exe in 'ClawdDesktop.exe', 'ClawdCentral.exe', 'Clawd.exe') { Remove-Item -LiteralPath (Join-Path $app $exe) -Force -ErrorAction SilentlyContinue }
 
 if ($Uninstall) {
   foreach ($p in $lnk, $boot) { Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue }
   Remove-Item -LiteralPath (Join-Path $app 'Clawdesk.exe') -Force -ErrorAction SilentlyContinue
-  Write-Output 'Removido. As suas escolhas continuam em ~\.claude\clawd.'
+  Write-Output 'Removed. Your settings are still in ~\.claude\clawd.'
   exit 0
 }
 
@@ -38,4 +38,4 @@ foreach ($l in @(@{ Path = $lnk; Args = '' }, @{ Path = $boot; Args = '--fundo' 
 }
 
 Start-Process $exePath
-Write-Output 'Pronto. O Clawdesk abriu e fica na bandeja do Windows.'
+Write-Output 'Done. Clawdesk is open and lives in the Windows tray.'

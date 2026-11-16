@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { accountOf, animFor, countTool, detailFor, greetingFor, moodOf, sceneSvg, spinnerAnim } from './register'
+import { accountOf, animFor, countTool, detailFor, greetingFor, langFrom, moodOf, sceneSvg, spinnerAnim } from './register'
 import { relayDue, relayFile, relayFrom, relayKey, relayPayload, staleFiles, withHold } from './relay'
 import { customTheme, surfaces } from './themes'
 import { ANIMS, PALETTES, animForTool, clawdSvg } from './sprites'
@@ -295,4 +295,20 @@ test('na nuvem, a sessão vai para o Gist com a origem e o e-mail', async ($, on
   expect(info.email).toBe('eu@usp.br')
   expect(info.cwd).toBe('projeto')
   expect(info.endedAt).toBeDefined()
+})
+
+test('o idioma vem do app; sem ele, do sistema', () => {
+  expect(langFrom('en', 'pt_BR.UTF-8')).toBe('en')
+  expect(langFrom('pt', 'en_US.UTF-8')).toBe('pt')
+  expect(langFrom(undefined, 'pt_BR.UTF-8')).toBe('pt')
+  expect(langFrom(undefined, 'en_US.UTF-8')).toBe('en')
+  expect(langFrom(undefined, 'C.UTF-8')).toBe('en')
+  expect(langFrom(undefined, undefined)).toBe('pt')
+  expect(langFrom('xx', undefined)).toBe('pt')
+
+  const now = Date.UTC(2026, 10, 14, 15)
+  const m = { firstMet: 0, lastSeen: now - 3_600_000, sessions: 4, tasksDone: 12, failures: 0, streak: 0, today: '', tasksToday: 0, lastFailAt: 0, pets: 0 }
+  expect(greetingFor({ ...m, sessions: 0 }, now, 10, 'en')).toBe("Hi! I'm Clawd. I'll stick around with you.")
+  expect(greetingFor(m, now, 10, 'en')).toBe('Good morning! 12 tasks together so far.')
+  expect(greetingFor(m, now, 10)).toBe('Bom dia! Já são 12 tarefas juntos.')
 })

@@ -1,5 +1,13 @@
 {
   "name": "clawdesk",
-  "owner": { "name": "alexzjss" },
-  "plugins": [{ "name": "clawdesk", "source": "./", "description": "Um Clawd por sessão: anima o indicador de trabalho, passeia no fundo da conversa, lembra de você e aplica o tema de cada conta." }]
+  "owner": {
+    "name": "alexzjss"
+  },
+  "plugins": [
+    {
+      "name": "clawdesk",
+      "source": "./",
+      "description": "Clawdesk: one Clawd per session. Animates the work indicator, walks around the conversation background, remembers you and applies each account's theme."
+    }
+  ]
 }
