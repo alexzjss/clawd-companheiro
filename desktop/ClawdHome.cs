@@ -18,6 +18,7 @@ namespace ClawdDesktop
         readonly Func<Cfg> cfg;
         readonly TextBlock summary = Ui.T("", 12.5, Ui.Text, false);
         readonly Border detail = new Border();
+        readonly Border frame;
         readonly StackPanel detailBody = new StackPanel();
         List<SessionView> last = new List<SessionView>();
         double lastNow;
@@ -26,7 +27,7 @@ namespace ClawdDesktop
         {
             cfg = config;
             Office = new OfficeView(config, photo);
-            var frame = new Border { CornerRadius = new CornerRadius(14), ClipToBounds = true, BorderBrush = Ui.Line, BorderThickness = new Thickness(1), Child = Office };
+            frame = new Border { CornerRadius = new CornerRadius(14), ClipToBounds = true, BorderBrush = Ui.Line, BorderThickness = new Thickness(1), Child = Office };
             Children.Add(frame);
 
             // o resumo, numa pílula no canto de cima
@@ -39,7 +40,7 @@ namespace ClawdDesktop
             detail.Width = 300;
             detail.HorizontalAlignment = HorizontalAlignment.Right;
             detail.VerticalAlignment = VerticalAlignment.Top;
-            detail.Margin = new Thickness(0, 14, 14, 0);
+            detail.Margin = new Thickness(0, 0, 0, 0);
             detail.Background = Pal.B("#1b1922", 0.97);
             detail.BorderBrush = Ui.Line;
             detail.BorderThickness = new Thickness(1);
@@ -95,7 +96,13 @@ namespace ClawdDesktop
         {
             string id = Office.Selected;
             var s = Office.SessionOf(id);
-            if (s == null) { detail.Visibility = Visibility.Collapsed; return; }
+            if (s == null)
+            {
+                // sem sessão escolhida, o escritório ocupa tudo
+                detail.Visibility = Visibility.Collapsed;
+                frame.Margin = new Thickness(0);
+                return;
+            }
             var acc = Office.AccountOf(id);
             double now = lastNow;
             detailBody.Children.Clear();
@@ -151,6 +158,7 @@ namespace ClawdDesktop
                 detailBody.Children.Add(open);
             }
             detail.Visibility = Visibility.Visible;
+            frame.Margin = new Thickness(0, 0, 314, 0);   // o escritório abre espaço para os detalhes
         }
     }
 }

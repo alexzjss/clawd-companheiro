@@ -723,7 +723,7 @@ namespace ClawdDesktop
             for (int i = 0; i < 9; i++) Px(dc, Pal.B(books[(i + 3) % books.Length], 1), bx + 6 + i * 9, by + 21, 6, 13);
             // tapete e sofá
             double sx = l.X + l.Width / 2 - 75, sy = l.Bottom - 46;
-            dc.DrawRoundedRectangle(Rug, null, new Rect(sx - 26, l.Y + 30, 202, sy - l.Y - 22), 10, 10);
+            dc.DrawRoundedRectangle(Rug, null, new Rect(sx + 26, l.Y + 34, 98, 40), 8, 8);
             Px(dc, Pal.B("#7a4f26", 1), sx + 40, l.Y + 44, 70, 24);
             Px(dc, WoodTop, sx + 40, l.Y + 44, 70, 4);
             Px(dc, Pal.B("#f6f1e4", 1), sx + 52, l.Y + 52, 8, 6);
