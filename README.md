@@ -47,11 +47,15 @@ O Clawd Companheiro fica na bandeja, perto do relógio. Clique no ícone para ab
 
 ### Home
 
+![A Home: os Clawds no alto e as sessões em cartões](docs/app-home.png)
+
 Todas as sessões de todas as contas numa tela só, em cartões: o que cada uma está fazendo, há quanto tempo, modelo, subagentes, contexto e custo. Quem está esperando você aparece primeiro, e dá para filtrar por "Ativas", "Esperando você" e por conta. Embaixo ficam os limites de uso de cada conta.
 
 **Com a Home aberta, os Clawds saem de cima da barra de tarefas e pulam para dentro dela**, num cenário que acompanha a hora do dia. Lá eles brincam mais vezes, vêm correndo quando você clica no chão, e passar o mouse num Clawd acende o cartão da sessão dele (clicar num cartão faz o Clawd da sessão dar um alô). Minimizou, fechou ou trocou de página, eles voltam para a barra.
 
 ### Estatísticas
+
+![Estatísticas de 30 dias](docs/app-estatisticas.png)
 
 O app guarda um resumo de cada dia em `~/.claude/clawd/historico.json`: custo, tempo trabalhando, sessões, tarefas concluídas e com erro, ferramentas usadas (por tipo: git, testes, edição, web...) e os horários. A página mostra 7, 30 ou 90 dias, de todas as contas ou de uma, comparando com o período anterior. Os números começam a contar quando o app passa a rodar.
 
@@ -63,11 +67,13 @@ As instâncias do Claude abertas e com quantas sessões; abrir, fechar e criar c
 - **Tema do Claude:** desligado até você ligar. Temas prontos ou seis cores à escolha, com prévia nos modos claro e escuro; sessões abertas trocam em alguns segundos.
 - **Clawd:** cor do corpo e dos detalhes, skin do Clawd grande e dos filhotes, chapéu do modelo.
 
-![Tema de uma conta](docs/central-tema.png)
+![Uma conta, na aba Geral](docs/app-contas.png)
 
 Ter mais de uma conta do Claude Desktop aberta ao mesmo tempo depende do Claude Profile Switcher; o app lista os perfis dele e cria contas novas por ele. Com uma conta só, ele não é necessário.
 
 ### Configurações
+
+![Configurações](docs/app-configuracoes.png)
 
 - **Clawds:** na barra de tarefas ou não, canto da tela, brincadeiras.
 - **Avisos:** quando uma sessão termina (só as que levaram mais que um tempo mínimo), dá erro ou espera você (pergunta, plano ou permissão). Clicar no aviso abre o Claude da conta. Não avisa o que você já está vendo: a Home aberta ou o Claude da conta na frente. Tem modo não perturbe por 1 hora ou até amanhã.
