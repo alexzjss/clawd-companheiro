@@ -36,4 +36,14 @@ jobs:
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create $env:GITHUB_REF_NAME dist/ClawdeskSetup.exe dist/ClawdeskSetup.exe.sha256 --title "Clawdesk $env:GITHUB_REF_NAME" --generate-notes
+        run: |
+          # O gh escreve em stderr quando a release não existe; isso não pode derrubar o passo.
+          $ErrorActionPreference = 'Continue'
+          # Se alguém já criou a release pelo navegador, só anexa os arquivos a ela.
+          gh release view $env:GITHUB_REF_NAME *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:GITHUB_REF_NAME dist/ClawdeskSetup.exe dist/ClawdeskSetup.exe.sha256 --clobber
+          } else {
+            gh release create $env:GITHUB_REF_NAME dist/ClawdeskSetup.exe dist/ClawdeskSetup.exe.sha256 --title "Clawdesk $env:GITHUB_REF_NAME" --generate-notes
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
