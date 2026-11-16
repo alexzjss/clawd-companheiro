@@ -116,7 +116,7 @@ namespace Clawdesk
             s.Id = Data.Str(d, "id", null);
             if (s.Id == null) return null;
             s.Account = Data.Str(d, "account", "");
-            s.Label = Data.Str(d, "label", "sessão");
+            s.Label = Data.Str(d, "label", L.T("sessão", "session"));
             s.State = Data.Str(d, "state", "ocioso");
             s.Tool = Data.Str(d, "tool", "");
             s.Detail = Data.Str(d, "detail", "");
@@ -269,7 +269,7 @@ namespace Clawdesk
             {
                 int wait = EveryMs;
                 try { wait = Once(); }
-                catch (Exception e) { Status = "sem conexão com o GitHub"; Program.Log("nuvem: " + e.Message); }
+                catch (Exception e) { Status = L.T("sem conexão com o GitHub", "no connection to GitHub"); Program.Log("nuvem: " + e.Message); }
                 Thread.Sleep(wait);
             }
         }
@@ -296,7 +296,7 @@ namespace Clawdesk
                 int code = (int)r.StatusCode;
                 r.Close();
                 if (code == 304) { Status = "ok"; return every; }   // nada mudou (e não gasta o limite)
-                Status = code == 404 ? "Gist não encontrado" : code == 401 ? "token recusado" : "o GitHub respondeu " + code;
+                Status = code == 404 ? L.T("Gist não encontrado", "Gist not found") : code == 401 ? L.T("token recusado", "token rejected") : L.T("o GitHub respondeu ", "GitHub answered ") + code;
                 // limite estourado: espera mais
                 return code == 403 || code == 429 ? 5 * 60000 : 60000;
             }
@@ -340,7 +340,7 @@ namespace Clawdesk
 
     static class Words
     {
-        public static readonly CultureInfo PtBR = new CultureInfo("pt-BR");
+        public static CultureInfo PtBR { get { return L.Culture; } }
 
         // A animação de trabalho para a ferramenta e o detalhe que o mod mandou.
         public static string WorkAnim(string tool, string detail)
@@ -395,33 +395,33 @@ namespace Clawdesk
 
         static readonly Dictionary<string, string> AnimSay = new Dictionary<string, string>
         {
-            { "bash", "No terminal…" }, { "ps", "No PowerShell…" }, { "git", "Mexendo no git…" }, { "test", "Rodando os testes…" },
-            { "install", "Instalando pacotes…" }, { "build", "Compilando…" }, { "trash", "Faxina!" }, { "stack", "Empilhando contêineres…" },
-            { "net", "Falando com a rede…" }, { "peek", "Dando uma olhada…" }, { "rocket", "Rodando o programa!" },
-            { "read", "Lendo…" }, { "grep", "Procurando no código…" }, { "glob", "Procurando arquivos…" }, { "edit", "Editando…" },
-            { "paint", "Mexendo na imagem…" }, { "write", "Escrevendo um arquivo…" }, { "grid", "No notebook…" },
-            { "search", "Pesquisando na web…" }, { "fetch", "Baixando uma página…" }, { "browser", "Navegando…" },
-            { "camera", "Tirando um print…" }, { "mouse", "Clicando por aí…" }, { "agent", "Chamei reforços!" },
-            { "conduct", "Regendo a equipe!" }, { "plan", "Atualizando o plano…" }, { "spell", "Abrindo uma skill…" },
-            { "toolbox", "Procurando ferramentas…" }, { "plug", "Conectando…" }, { "tool", "Usando ferramentas…" },
+            { "bash", L.T("No terminal…", "In the terminal…") }, { "ps", L.T("No PowerShell…", "In PowerShell…") }, { "git", L.T("Mexendo no git…", "Doing git stuff…") }, { "test", L.T("Rodando os testes…", "Running the tests…") },
+            { "install", L.T("Instalando pacotes…", "Installing packages…") }, { "build", L.T("Compilando…", "Building…") }, { "trash", L.T("Faxina!", "Cleanup!") }, { "stack", L.T("Empilhando contêineres…", "Stacking containers…") },
+            { "net", L.T("Falando com a rede…", "Talking to the network…") }, { "peek", L.T("Dando uma olhada…", "Taking a look…") }, { "rocket", L.T("Rodando o programa!", "Running the program!") },
+            { "read", L.T("Lendo…", "Reading…") }, { "grep", L.T("Procurando no código…", "Searching the code…") }, { "glob", L.T("Procurando arquivos…", "Looking for files…") }, { "edit", L.T("Editando…", "Editing…") },
+            { "paint", L.T("Mexendo na imagem…", "Touching up an image…") }, { "write", L.T("Escrevendo um arquivo…", "Writing a file…") }, { "grid", L.T("No notebook…", "In the notebook…") },
+            { "search", L.T("Pesquisando na web…", "Searching the web…") }, { "fetch", L.T("Baixando uma página…", "Fetching a page…") }, { "browser", L.T("Navegando…", "Browsing…") },
+            { "camera", L.T("Tirando um print…", "Taking a screenshot…") }, { "mouse", L.T("Clicando por aí…", "Clicking around…") }, { "agent", L.T("Chamei reforços!", "Called for backup!") },
+            { "conduct", L.T("Regendo a equipe!", "Conducting the team!") }, { "plan", L.T("Atualizando o plano…", "Updating the plan…") }, { "spell", L.T("Abrindo uma skill…", "Opening a skill…") },
+            { "toolbox", L.T("Procurando ferramentas…", "Looking for tools…") }, { "plug", L.T("Conectando…", "Connecting…") }, { "tool", L.T("Usando ferramentas…", "Using tools…") },
         };
 
         public static string Say(string anim)
         {
             string s;
-            return AnimSay.TryGetValue(anim, out s) ? s : "Trabalhando…";
+            return AnimSay.TryGetValue(anim, out s) ? s : L.T("Trabalhando…", "Working…");
         }
 
         static readonly Dictionary<string, string> DetailWord = new Dictionary<string, string>
         {
-            { "codigo", "código" }, { "doc", "texto" }, { "dados", "dados" }, { "imagem", "imagem" }, { "pdf", "PDF" },
-            { "web", "página" }, { "notebook", "notebook" }, { "arquivo", "arquivo" },
+            { "codigo", L.T("código", "code") }, { "doc", L.T("texto", "text") }, { "dados", L.T("dados", "data") }, { "imagem", L.T("imagem", "image") }, { "pdf", "PDF" },
+            { "web", L.T("página", "page") }, { "notebook", "notebook" }, { "arquivo", L.T("arquivo", "file") },
         };
 
         // O estado de uma sessão em poucas palavras, para o painel.
         public static string Short(SessionView s, double nowMs)
         {
-            if (!s.IsActive(nowMs)) return s.EndedAt > 0 ? "encerrada" : "parada " + Ago(nowMs - s.UpdatedAt);
+            if (!s.IsActive(nowMs)) return s.EndedAt > 0 ? L.T("encerrada", "ended") : L.T("parada ", "idle ") + Ago(nowMs - s.UpdatedAt);
             string since = s.TurnStartedAt > 0 ? " " + Dur(nowMs - s.TurnStartedAt) : "";
             switch (s.State)
             {
@@ -431,28 +431,45 @@ namespace Clawdesk
                     string what;
                     string dw;
                     if (anim == "read" || anim == "edit" || anim == "write")
-                        what = (anim == "read" ? "lendo " : anim == "edit" ? "editando " : "criando ") + (DetailWord.TryGetValue(s.Detail ?? "", out dw) ? dw : "arquivo");
+                        what = (anim == "read" ? L.T("lendo ", "reading ") : anim == "edit" ? L.T("editando ", "editing ") : L.T("criando ", "creating ")) + (DetailWord.TryGetValue(s.Detail ?? "", out dw) ? dw : L.T("arquivo", "file"));
                     else if (anim == "agent" || anim == "conduct")
-                        what = s.Agents > 0 ? (int)s.Agents + (s.Agents == 1 ? " subagente" : " subagentes") : "subagentes";
+                        what = s.Agents > 0 ? (int)s.Agents + (s.Agents == 1 ? L.T(" subagente", " subagent") : L.T(" subagentes", " subagents")) : L.T("subagentes", "subagents");
                     else if ((s.Tool == "Bash" || s.Tool == "PowerShell") && !string.IsNullOrEmpty(s.Detail) && s.Detail != "comando")
-                        what = "terminal: " + s.Detail;
+                        what = "terminal: " + DetailName(s.Detail);
                     else what = Say(anim).TrimEnd('…', '!').ToLowerInvariant();
                     return what + since;
                 }
-                case "pensando": return "pensando" + since;
-                case "aguardando": return s.Tool == "AskUserQuestion" ? "te fez uma pergunta" : s.Tool == "ExitPlanMode" ? "plano para aprovar" : "pede permissão";
-                case "compactando": return "resumindo a conversa";
-                case "feito": return "terminou";
-                case "erro": return "deu erro";
-                case "interrompido": return "interrompida";
-                case "recusa": return "recusou";
-                case "dormindo": return "dormindo";
-                case "oi": return "começando";
-                default: return "livre";
+                case "pensando": return L.T("pensando", "thinking") + since;
+                case "aguardando": return s.Tool == "AskUserQuestion" ? L.T("te fez uma pergunta", "asked you a question") : s.Tool == "ExitPlanMode" ? L.T("plano para aprovar", "plan to approve") : L.T("pede permissão", "asks for permission");
+                case "compactando": return L.T("resumindo a conversa", "compacting the conversation");
+                case "feito": return L.T("terminou", "done");
+                case "erro": return L.T("deu erro", "error");
+                case "interrompido": return L.T("interrompida", "interrupted");
+                case "recusa": return L.T("recusou", "refused");
+                case "dormindo": return L.T("dormindo", "asleep");
+                case "oi": return L.T("começando", "starting");
+                default: return L.T("livre", "free");
             }
         }
 
-        public static string Ago(double ms) { return ms < 60000 ? "agora" : "há " + Dur(ms); }
+        public static string Ago(double ms) { return ms < 60000 ? L.T("agora", "just now") : L.T("há " + Dur(ms), Dur(ms) + " ago"); }
+
+        // O tipo de comando do terminal (git, teste...), como o mod manda, em palavras.
+        static string DetailName(string d)
+        {
+            if (!L.En) return d;
+            switch (d)
+            {
+                case "teste": return "tests";
+                case "instalar": return "install";
+                case "compilar": return "build";
+                case "apagar": return "delete";
+                case "rede": return "network";
+                case "olhar": return "browse";
+                case "rodar": return "run";
+                default: return d;
+            }
+        }
 
         public static string Dur(double ms)
         {
@@ -467,12 +484,12 @@ namespace Clawdesk
         public static string LimitName(string kind)
         {
             string k = (kind ?? "").ToLowerInvariant();
-            if (k == "five_hour") return "5 horas";
-            if (k == "seven_day") return "Semanal";
+            if (k == "five_hour") return L.T("5 horas", "5 hours");
+            if (k == "seven_day") return L.T("Semanal", "Weekly");
             if (k.Contains("fable")) return "Fable";
             if (k.Contains("opus")) return "Opus";
             if (k.Contains("sonnet")) return "Sonnet";
-            if (k.Contains("spend")) return "Créditos";
+            if (k.Contains("spend")) return L.T("Créditos", "Credits");
             return k.Replace('_', ' ');
         }
 
@@ -480,12 +497,12 @@ namespace Clawdesk
         {
             if (!when.HasValue) return "";
             TimeSpan left = when.Value - DateTime.Now;
-            if (left.TotalMinutes < 1) return "agora";
+            if (left.TotalMinutes < 1) return L.T("agora", "now");
             if (left.TotalHours < 24) return Dur(left.TotalMilliseconds);
             return when.Value.ToString("ddd HH:mm", PtBR);
         }
 
-        public static string Money(double usd) { return "US$ " + usd.ToString("0.00", PtBR); }
+        public static string Money(double usd) { return L.En ? "$" + usd.ToString("0.00", PtBR) : "US$ " + usd.ToString("0.00", PtBR); }
     }
 
     // --------------------------------------------------------------- criaturas --
@@ -599,12 +616,12 @@ namespace Clawdesk
         public const double Ground = H;
         const int BigP = 3, PupP = 2;
 
-        static readonly string[] Dones = { "Pronto!", "Feito!", "Mais uma!", "Terminei!", "Prontinho." };
-        static readonly string[] Pets = { "Hehe!", "Obrigado!", "De novo!", "<3", "Tô feliz!" };
-        static readonly string[] Falls = { "Uau!", "Ufa!", "Eita!", "Tô tonto…" };
-        static readonly string[] Thinks = { "Hmm…", "Deixa eu pensar…", "Interessante…" };
-        static readonly string[] Hellos = { "Oi!", "Opa!", "Tô aqui!", "E aí?" };
-        static readonly string[] NewPup = { "Mais uma sessão!", "Olha, um filhote!", "Mais um!" };
+        static readonly string[] Dones = { L.T("Pronto!", "Done!"), L.T("Feito!", "Finished!"), L.T("Mais uma!", "One more!"), L.T("Terminei!", "All done!"), L.T("Prontinho.", "There you go.") };
+        static readonly string[] Pets = { L.T("Hehe!", "Hehe!"), L.T("Obrigado!", "Thank you!"), L.T("De novo!", "Again!"), "<3", L.T("Tô feliz!", "I'm happy!") };
+        static readonly string[] Falls = { L.T("Uau!", "Whoa!"), L.T("Ufa!", "Phew!"), L.T("Eita!", "Yikes!"), L.T("Tô tonto…", "I'm dizzy…") };
+        static readonly string[] Thinks = { L.T("Hmm…", "Hmm…"), L.T("Deixa eu pensar…", "Let me think…"), L.T("Interessante…", "Interesting…") };
+        static readonly string[] Hellos = { L.T("Oi!", "Hi!"), L.T("Opa!", "Hey!"), L.T("Tô aqui!", "I'm here!"), L.T("E aí?", "What's up?") };
+        static readonly string[] NewPup = { L.T("Mais uma sessão!", "Another session!"), L.T("Olha, um filhote!", "Look, a pup!"), L.T("Mais um!", "One more!") };
 
         readonly StageView view;
         readonly InfoPanel panel;
@@ -927,9 +944,9 @@ namespace Clawdesk
         string Greeting(Account a)
         {
             int h = DateTime.Now.Hour;
-            string hi = h >= 5 && h < 12 ? "Bom dia!" : h >= 12 && h < 18 ? "Boa tarde!" : "Boa noite!";
+            string hi = h >= 5 && h < 12 ? L.T("Bom dia!", "Good morning!") : h >= 12 && h < 18 ? L.T("Boa tarde!", "Good afternoon!") : L.T("Boa noite!", "Good evening!");
             double done = Data.Num(a.Memory, "tasksDone", 0);
-            return done > 0 ? hi + " " + (int)done + " tarefas juntos." : hi;
+            return done > 0 ? hi + " " + (int)done + L.T(" tarefas juntos.", " tasks together.") : hi;
         }
 
         Creature NewCreature(Account a, bool pup, string sid, double t)
@@ -953,7 +970,7 @@ namespace Clawdesk
 
             var wanted = a.Active.Skip(1).Take(4).ToList();
             foreach (var p in a.Pups)
-                if (!p.Leaving && !wanted.Any(s => s.Id == p.SessionId)) { p.Leaving = true; p.LeaveT = t; Say(p, "Tchau!", 1, t); }
+                if (!p.Leaving && !wanted.Any(s => s.Id == p.SessionId)) { p.Leaving = true; p.LeaveT = t; Say(p, L.T("Tchau!", "Bye!"), 1, t); }
             foreach (var s in wanted)
             {
                 var p = a.Pups.FirstOrDefault(x => x.SessionId == s.Id && !x.Leaving);
@@ -1006,23 +1023,23 @@ namespace Clawdesk
                     break;
                 case "erro":
                     React(c, "error", 3.6, t);
-                    Say(c, "Ops… deu erro.", 3, t);
+                    Say(c, L.T("Ops… deu erro.", "Oops… an error."), 3, t);
                     break;
                 case "interrompido":
                     React(c, "halt", 2.4, t);
-                    Say(c, "Opa, parei!", 2.2, t);
+                    Say(c, L.T("Opa, parei!", "Whoa, stopped!"), 2.2, t);
                     break;
                 case "recusa":
                     React(c, "refuse", 3, t);
-                    Say(c, "Esse eu não faço.", 2.6, t);
+                    Say(c, L.T("Esse eu não faço.", "I won't do that one."), 2.6, t);
                     break;
                 case "aguardando":
                     c.React = null;
-                    Say(c, c.Tool == "AskUserQuestion" ? "Tenho uma pergunta!" : c.Tool == "ExitPlanMode" ? "Aprova o plano?" : "Posso fazer isso?", 3, t);
+                    Say(c, c.Tool == "AskUserQuestion" ? L.T("Tenho uma pergunta!", "I have a question!") : c.Tool == "ExitPlanMode" ? L.T("Aprova o plano?", "Approve the plan?") : L.T("Posso fazer isso?", "Can I do this?"), 3, t);
                     break;
                 case "compactando":
                     c.React = null;
-                    if (!c.Pup) Say(c, "Resumindo a conversa…", 2.4, t);
+                    if (!c.Pup) Say(c, L.T("Resumindo a conversa…", "Compacting the conversation…"), 2.4, t);
                     break;
                 case "pensando":
                     if (old != "trabalhando" && !c.Pup) Say(c, Thinks[rng.Next(Thinks.Length)], 1.8, t);
@@ -1053,7 +1070,7 @@ namespace Clawdesk
                 if (o.Main.React != null || BusyAnim(o.Main) != null || o.Main == drag || o.Main.Scene != null) continue;
                 o.Main.Facing = who.Main.X > o.Main.X ? 1 : -1;
                 React(o.Main, "cheer", 1.6, t);
-                o.Main.PendingText = "Boa, " + who.Name + "!";
+                o.Main.PendingText = L.T("Boa, ", "Nice, ") + who.Name + "!";
                 o.Main.PendingAt = t + 0.5;
             }
         }
@@ -1375,20 +1392,20 @@ namespace Clawdesk
 
         static readonly string[][] Talks =
         {
-            new[] { "Quantos tokens hoje?", "Nem me fala…", "Perdi a conta!" },
-            new[] { "Viu meu ponto e vírgula?", "Tava no fim da linha!" },
-            new[] { "Compilou de primeira!", "Mentira!", "Juro!" },
-            new[] { "Bora um café?", "Café de pixel?", "O melhor que tem!" },
-            new[] { "Achei um bug.", "Grande?", "Ele tem patinhas…" },
-            new[] { "Tô com sono…", "Só mais um commit.", "Tá bom, unzinho." },
-            new[] { "Já testou?", "Testei no olho.", "Hmm…" },
-            new[] { "Gostei do seu chapéu!", "Valeu! Cadê o seu?", "Esqueci em casa." },
-            new[] { "Sabe uma piada de recursão?", "Não.", "Sabe uma piada de recursão?" },
-            new[] { "Quem fechou a aba?", "Não fui eu!", "…fui eu." },
-            new[] { "Olha a barra de tarefas!", "Que vista bonita." },
-            new[] { "Tabs ou espaços?", "Espaços.", "Hmpf." },
-            new[] { "Quanto falta pro limite?", "Melhor nem olhar.", "Olhei. Ai." },
-            new[] { "Funciona na minha máquina!", "A gente MORA na sua máquina." },
+            new[] { L.T("Quantos tokens hoje?", "How many tokens today?"), L.T("Nem me fala…", "Don't ask…"), L.T("Perdi a conta!", "Lost count!") },
+            new[] { L.T("Viu meu ponto e vírgula?", "Seen my semicolon?"), L.T("Tava no fim da linha!", "It was at the end of the line!") },
+            new[] { L.T("Compilou de primeira!", "It compiled on the first try!"), L.T("Mentira!", "No way!"), L.T("Juro!", "I swear!") },
+            new[] { L.T("Bora um café?", "Coffee break?"), L.T("Café de pixel?", "Pixel coffee?"), L.T("O melhor que tem!", "The best there is!") },
+            new[] { L.T("Achei um bug.", "I found a bug."), L.T("Grande?", "Big one?"), L.T("Ele tem patinhas…", "It has little legs…") },
+            new[] { L.T("Tô com sono…", "I'm sleepy…"), L.T("Só mais um commit.", "Just one more commit."), L.T("Tá bom, unzinho.", "Fine, just one.") },
+            new[] { L.T("Já testou?", "Did you test it?"), L.T("Testei no olho.", "Eyeballed it."), L.T("Hmm…", "Hmm…") },
+            new[] { L.T("Gostei do seu chapéu!", "Nice hat!"), L.T("Valeu! Cadê o seu?", "Thanks! Where's yours?"), L.T("Esqueci em casa.", "Left it at home.") },
+            new[] { L.T("Sabe uma piada de recursão?", "Know a recursion joke?"), L.T("Não.", "No."), L.T("Sabe uma piada de recursão?", "Know a recursion joke?") },
+            new[] { L.T("Quem fechou a aba?", "Who closed the tab?"), L.T("Não fui eu!", "Wasn't me!"), L.T("…fui eu.", "…it was me.") },
+            new[] { L.T("Olha a barra de tarefas!", "Look at the taskbar!"), L.T("Que vista bonita.", "What a view.") },
+            new[] { L.T("Tabs ou espaços?", "Tabs or spaces?"), L.T("Espaços.", "Spaces."), "Hmpf." },
+            new[] { L.T("Quanto falta pro limite?", "How close to the limit?"), L.T("Melhor nem olhar.", "Better not look."), L.T("Olhei. Ai.", "I looked. Ouch.") },
+            new[] { L.T("Funciona na minha máquina!", "Works on my machine!"), L.T("A gente MORA na sua máquina.", "We LIVE on your machine.") },
         };
 
         string Pick(params string[] opts) { return opts[rng.Next(opts.Length)]; }
@@ -1478,7 +1495,7 @@ namespace Clawdesk
                 case "talk":
                 {
                     var lines = Talks[rng.Next(Talks.Length)].ToList();
-                    if (a.Acc != b.Acc && rng.NextDouble() < 0.5) { lines.Insert(0, "Oi, " + b.Acc.Name + "!"); lines.Insert(1, "Oi, " + a.Acc.Name + "!"); }
+                    if (a.Acc != b.Acc && rng.NextDouble() < 0.5) { lines.Insert(0, L.T("Oi, ", "Hi, ") + b.Acc.Name + "!"); lines.Insert(1, L.T("Oi, ", "Hi, ") + a.Acc.Name + "!"); }
                     s.Lines = lines.ToArray();
                     PlanMeet(s, Half(a) + Half(b) + 26);
                     break;
@@ -1520,7 +1537,7 @@ namespace Clawdesk
                 c.IdleUntil = t + 1.5 + rng.NextDouble() * 2;
                 if (c.Lift > 0 && c != drag && !c.Falling) { c.Falling = true; c.VY = 0; }
                 if (broken && Alive(c) && c.React == null && BusyAnim(c) == null && c != drag && !c.Leaving)
-                    Say(c, Pick("Ah…", "Fica pra depois!", "Ué?"), 1.4, t);
+                    Say(c, Pick(L.T("Ah…", "Aw…"), L.T("Fica pra depois!", "Maybe later!"), L.T("Ué?", "Huh?")), 1.4, t);
             }
             nextEvent = t + (festa ? 2.5 : 30 + rng.NextDouble() * 45);
         }
@@ -1583,7 +1600,7 @@ namespace Clawdesk
             switch (s.Phase)
             {
                 case 0:
-                    if (Meet(s, t, dt)) { Next(s, t); Say(A, Pick("Toca aqui!", "Bate aqui!", "Hi-five!"), 1.6, t); }
+                    if (Meet(s, t, dt)) { Next(s, t); Say(A, Pick(L.T("Toca aqui!", "High five!"), L.T("Bate aqui!", "Gimme five!"), "Hi-five!"), 1.6, t); }
                     return true;
                 case 1:
                     SetAnim(A, "ready", t); SetAnim(B, "ready", t);
@@ -1600,7 +1617,7 @@ namespace Clawdesk
                 }
             }
             React(A, "laugh", 1.4, t); React(B, "laugh", 1.4, t);
-            Say(B, Pick("Boa!", "Isso aí!", "Uhul!"), 1.5, t);
+            Say(B, Pick(L.T("Boa!", "Nice!"), L.T("Isso aí!", "That's it!"), L.T("Uhul!", "Woohoo!")), 1.5, t);
             return false;
         }
 
@@ -1625,8 +1642,8 @@ namespace Clawdesk
         {
             if (s.Phase == 0)
             {
-                Say(A, Pick("Pega-pega!", "Vou te pegar!"), 1.5, t);
-                B.PendingText = "Ih!";
+                Say(A, Pick(L.T("Pega-pega!", "Tag!"), L.T("Vou te pegar!", "I'll get you!")), 1.5, t);
+                B.PendingText = L.T("Ih!", "Uh-oh!");
                 B.PendingAt = t + 0.4;
                 s.Dir = B.X >= A.X ? 1 : -1;
                 Next(s, t);
@@ -1646,14 +1663,14 @@ namespace Clawdesk
                 {
                     s.Count++;
                     Sparkle((ch.X + run.X) / 2, Ground - 14 * run.P, 3);
-                    Say(ch, Pick("Peguei!", "Tá com você!", "Ha!"), 1.1, t);
+                    Say(ch, Pick(L.T("Peguei!", "Got you!"), L.T("Tá com você!", "You're it!"), "Ha!"), 1.1, t);
                     s.PhaseAt = t;
                     s.Dir = ch.X >= run.X ? 1 : -1;   // quem foi pego vira caçador; o outro foge
                     if (s.Count >= 4 || t - s.Start > 16) Next(s, t);
                 }
                 return true;
             }
-            Say(A, Pick("Ufa! Cansei.", "Chega, chega!"), 1.6, t);
+            Say(A, Pick(L.T("Ufa! Cansei.", "Phew! I'm tired."), L.T("Chega, chega!", "Enough, enough!")), 1.6, t);
             React(A, "laugh", 1.4, t); React(B, "laugh", 1.4, t);
             return false;
         }
@@ -1662,7 +1679,7 @@ namespace Clawdesk
         {
             if (s.Phase == 0)
             {
-                if (Meet(s, t, dt)) { Next(s, t); Say(A, Pick("Bola!", "Olha a bola!", "Chuta pra cá!"), 1.4, t); }
+                if (Meet(s, t, dt)) { Next(s, t); Say(A, Pick(L.T("Bola!", "Ball!"), L.T("Olha a bola!", "Heads up!"), L.T("Chuta pra cá!", "Kick it here!")), 1.4, t); }
                 return true;
             }
             Creature k = s.Count % 2 == 0 ? A : B, r = k == A ? B : A;
@@ -1692,13 +1709,13 @@ namespace Clawdesk
                 SetAnim(r, u < 0.9 ? "head" : "dizzy", t);
                 if (u >= 1)
                 {
-                    if (!s.Flag) { s.Flag = true; Sparkle(r.X, Ground - 16 * r.P, 4); Say(r, "Ai!", 1.0, t); }
+                    if (!s.Flag) { s.Flag = true; Sparkle(r.X, Ground - 16 * r.P, 4); Say(r, L.T("Ai!", "Ow!"), 1.0, t); }
                     s.BallX = double.NaN;
                 }
                 if (pt > 2.2) Next(s, t);
                 return true;
             }
-            Say(k, "Foi mal!", 1.5, t);
+            Say(k, L.T("Foi mal!", "My bad!"), 1.5, t);
             React(r, "dizzy", 1.2, t); React(k, "laugh", 1.4, t);
             return false;
         }
@@ -1709,7 +1726,7 @@ namespace Clawdesk
             switch (s.Phase)
             {
                 case 0:
-                    if (Meet(s, t, dt)) { Next(s, t); Say(A, Pick("Pula-sela!", "Abaixa aí!"), 1.4, t); }
+                    if (Meet(s, t, dt)) { Next(s, t); Say(A, Pick(L.T("Pula-sela!", "Leapfrog!"), L.T("Abaixa aí!", "Duck down!")), 1.4, t); }
                     return true;
                 case 1:
                     Face(j, b);
@@ -1736,7 +1753,7 @@ namespace Clawdesk
                 }
             }
             React(A, "laugh", 1.4, t); React(B, "laugh", 1.4, t);
-            Say(B, Pick("De novo!", "Hahaha!"), 1.4, t);
+            Say(B, Pick(L.T("De novo!", "Again!"), L.T("Hahaha!", "Hahaha!")), 1.4, t);
             return false;
         }
 
@@ -1747,7 +1764,7 @@ namespace Clawdesk
             {
                 case 0:
                 {
-                    if (!s.Flag) { s.Flag = true; Say(A, Pick("Corrida até a bandeira!", "Aposto corrida!"), 1.8, t); }
+                    if (!s.Flag) { s.Flag = true; Say(A, Pick(L.T("Corrida até a bandeira!", "Race to the flag!"), L.T("Aposto corrida!", "Race you!")), 1.8, t); }
                     bool a = Go(A, s.Dir > 0 ? 34 : W - 34, 50, dt, t, "walk");
                     bool b = Go(B, s.Dir > 0 ? W - 34 : 34, 50, dt, t, "walk");
                     if (a) { A.Facing = s.Dir; SetAnim(A, "ready", t); }
@@ -1757,7 +1774,7 @@ namespace Clawdesk
                 }
                 case 1:
                 {
-                    string[] cd = { "3", "2", "1", "Já!" };
+                    string[] cd = { "3", "2", "1", L.T("Já!", "Go!") };
                     int i = Math.Min(3, (int)(pt / 0.6));
                     if (i >= s.Count) { Say(A, cd[i], 0.55, t); s.Count = i + 1; }
                     SetAnim(A, "ready", t); SetAnim(B, "ready", t);
@@ -1775,8 +1792,8 @@ namespace Clawdesk
                     if (a && b)
                     {
                         Creature w = s.Winner, l = w == A ? B : A;
-                        Say(w, Pick("Ganhei!", "Primeiro!"), 1.6, t);
-                        l.PendingText = Pick("Quase!", "Revanche!", "Roubou!");
+                        Say(w, Pick(L.T("Ganhei!", "I won!"), L.T("Primeiro!", "First!")), 1.6, t);
+                        l.PendingText = Pick(L.T("Quase!", "So close!"), L.T("Revanche!", "Rematch!"), L.T("Roubou!", "Cheater!"));
                         l.PendingAt = t + 0.9;
                         Next(s, t);
                     }
@@ -1798,11 +1815,11 @@ namespace Clawdesk
             switch (s.Phase)
             {
                 case 0:
-                    if (Meet(s, t, dt)) { Next(s, t); Say(A, Pick("Duelo de dança!", "Solta o som!"), 1.6, t); }
+                    if (Meet(s, t, dt)) { Next(s, t); Say(A, Pick(L.T("Duelo de dança!", "Dance-off!"), L.T("Solta o som!", "Drop the beat!")), 1.6, t); }
                     return true;
                 case 1:
                     SetAnim(A, "dance", t); SetAnim(B, "watch", t);
-                    if (pt > 2.4) { Next(s, t); Say(B, Pick("Minha vez!", "Olha essa!"), 1.4, t); }
+                    if (pt > 2.4) { Next(s, t); Say(B, Pick(L.T("Minha vez!", "My turn!"), L.T("Olha essa!", "Check this out!")), 1.4, t); }
                     return true;
                 case 2:
                     SetAnim(B, "dance", t); SetAnim(A, "watch", t);
@@ -1813,7 +1830,7 @@ namespace Clawdesk
                     if (pt > 2.6) Next(s, t);
                     return true;
             }
-            Say(A, Pick("Empate!", "Arrasamos!"), 1.5, t);
+            Say(A, Pick(L.T("Empate!", "It's a tie!"), L.T("Arrasamos!", "We nailed it!")), 1.5, t);
             React(A, "cheer", 1.2, t); React(B, "cheer", 1.2, t);
             return false;
         }
@@ -1830,13 +1847,13 @@ namespace Clawdesk
                     {
                         Face(A, B);
                         Next(s, t);
-                        Say(A, Pick("Quer um biscoito?", "Trouxe lanche!"), 1.8, t);
+                        Say(A, Pick(L.T("Quer um biscoito?", "Want a cookie?"), L.T("Trouxe lanche!", "I brought snacks!")), 1.8, t);
                     }
                     return true;
                 }
                 case 1:
                     SetAnim(A, "give", t); SetAnim(B, "watch", t);
-                    if (pt > 1.7) { Next(s, t); Say(B, Pick("Valeu!", "Que delícia!", "Oba, biscoito!"), 1.6, t); }
+                    if (pt > 1.7) { Next(s, t); Say(B, Pick(L.T("Valeu!", "Thanks!"), L.T("Que delícia!", "Yummy!"), L.T("Oba, biscoito!", "Yay, a cookie!")), 1.6, t); }
                     return true;
                 case 2:
                     SetAnim(A, "eat", t); SetAnim(B, "eat", t);
@@ -1856,7 +1873,7 @@ namespace Clawdesk
                     if (Meet(s, t, dt))
                     {
                         Next(s, t);
-                        Say(A, Pick("Cabo de guerra!", "Segura essa!"), 1.4, t);
+                        Say(A, Pick(L.T("Cabo de guerra!", "Tug of war!"), L.T("Segura essa!", "Hold on to this!")), 1.4, t);
                         s.Dir = w.X >= l.X ? 1 : -1;
                         s.AX = A.X; s.BX = B.X;
                     }
@@ -1878,8 +1895,8 @@ namespace Clawdesk
                     if (!s.Flag)
                     {
                         s.Flag = true;
-                        Say(w, Pick("Ganhei!", "Força!"), 1.4, t);
-                        l.PendingText = "Eita!";
+                        Say(w, Pick(L.T("Ganhei!", "I won!"), L.T("Força!", "Pull!")), 1.4, t);
+                        l.PendingText = L.T("Eita!", "Yikes!");
                         l.PendingAt = t + 0.6;
                     }
                     if (pt < 0.35) l.X += s.Dir * 70 * dt;
@@ -1911,7 +1928,7 @@ namespace Clawdesk
                         Face(A, B);
                         Next(s, t);
                         s.AX = A.X;
-                        Say(A, Pick("Upa, cavalinho!", "Me dá carona?"), 1.6, t);
+                        Say(A, Pick(L.T("Upa, cavalinho!", "Giddy up!"), L.T("Me dá carona?", "Give me a ride?")), 1.6, t);
                     }
                     return true;
                 }
@@ -1932,7 +1949,7 @@ namespace Clawdesk
                     A.Facing = B.Facing;
                     A.Lift = RideH(A, B) + (F(t, 7, 2) == 0 ? B.P : 0);
                     SetAnim(A, "ride", t);
-                    if (!s.Flag && pt > 0.8) { s.Flag = true; Say(A, Pick("Iuhuu!", "Mais rápido!", "Que vista!"), 1.6, t); }
+                    if (!s.Flag && pt > 0.8) { s.Flag = true; Say(A, Pick(L.T("Iuhuu!", "Yeehaw!"), L.T("Mais rápido!", "Faster!"), L.T("Que vista!", "What a view!")), 1.6, t); }
                     if (pt > 4.8)
                     {
                         Next(s, t);
@@ -1964,11 +1981,11 @@ namespace Clawdesk
             switch (s.Phase)
             {
                 case 0:
-                    if (Meet(s, t, dt)) { Next(s, t); Say(A, Pick("Vem cá!", "Abraço!"), 1.3, t); }
+                    if (Meet(s, t, dt)) { Next(s, t); Say(A, Pick(L.T("Vem cá!", "Come here!"), L.T("Abraço!", "Hug!")), 1.3, t); }
                     return true;
                 case 1:
                     SetAnim(A, "hug", t); SetAnim(B, "hug", t);
-                    if (!s.Flag && pt > 1.1) { s.Flag = true; Say(B, Pick("Amigos!", "<3", "Que fofo!"), 1.4, t); }
+                    if (!s.Flag && pt > 1.1) { s.Flag = true; Say(B, Pick(L.T("Amigos!", "Friends!"), "<3", L.T("Que fofo!", "So cute!")), 1.4, t); }
                     if (pt > 2.6) Next(s, t);
                     return true;
             }
@@ -1984,7 +2001,7 @@ namespace Clawdesk
             {
                 s.BugX = Clamp(s.FX + Math.Sin(el * 0.8) * 110, 24, W - 24);
                 s.BugY = 30 + Math.Sin(el * 2.6) * 12 + (el < 1 ? (1 - el) * 70 : 0);
-                if (!s.Flag && el > 0.6) { s.Flag = true; Say(A, Pick("Uma borboleta!", "Ooh!"), 1.4, t); }
+                if (!s.Flag && el > 0.6) { s.Flag = true; Say(A, Pick(L.T("Uma borboleta!", "A butterfly!"), L.T("Ooh!", "Ooh!")), 1.4, t); }
                 if (s.JumpAt > 0)
                 {
                     double u = (t - s.JumpAt) / 0.5;
@@ -2000,7 +2017,7 @@ namespace Clawdesk
                 {
                     Next(s, t);
                     A.Lift = 0;
-                    Say(A, Pick("Tchau, borboleta!", "Quase!"), 1.6, t);
+                    Say(A, Pick(L.T("Tchau, borboleta!", "Bye, butterfly!"), L.T("Quase!", "So close!")), 1.6, t);
                 }
                 return true;
             }
@@ -2279,7 +2296,7 @@ namespace Clawdesk
                 lastDragPt = pt;
                 lastDragT = t;
                 panel.Close2();
-                Say(drag, drag.Pup ? "Ei!" : "Ei! Me põe no chão!", 2.2, t);
+                Say(drag, drag.Pup ? L.T("Ei!", "Hey!") : L.T("Ei! Me põe no chão!", "Hey! Put me down!"), 2.2, t);
             }
             drag.X = Clamp(pt.X - dragOff.X, 24, W - 24);
             drag.Lift = Clamp(Ground - (pt.Y - dragOff.Y), 0, MaxLift);
@@ -2313,7 +2330,7 @@ namespace Clawdesk
             lastPet = t;
             if (c.Falling) return;
             React(c, "pet", 1.8, t);
-            if (petCount >= 5) { Say(c, "Tá bom, tá bom! Hahaha", 2.2, t); petCount = 0; }
+            if (petCount >= 5) { Say(c, L.T("Tá bom, tá bom! Hahaha", "Okay, okay! Hahaha"), 2.2, t); petCount = 0; }
             else Say(c, Pets[rng.Next(Pets.Length)], 1.6, t);
         }
 
@@ -2324,15 +2341,15 @@ namespace Clawdesk
             panel.Close2();
             var a = c.Acc;
             var menu = new ContextMenu();
-            menu.Items.Add(Item("Abrir o Claude " + a.Name, true, delegate { OpenClaude(a); }));
-            menu.Items.Add(Item("Fazer carinho", false, delegate { Pet(c, T); }));
-            menu.Items.Add(Item("Esconder por 1 hora", false, delegate { a.HiddenUntil = T + 3600; a.Visible = false; a.Main = null; a.Pups.Clear(); }));
+            menu.Items.Add(Item(L.T("Abrir o Claude ", "Open Claude ") + a.Name, true, delegate { OpenClaude(a); }));
+            menu.Items.Add(Item(L.T("Fazer carinho", "Pet"), false, delegate { Pet(c, T); }));
+            menu.Items.Add(Item(L.T("Esconder por 1 hora", "Hide for 1 hour"), false, delegate { a.HiddenUntil = T + 3600; a.Visible = false; a.Main = null; a.Pups.Clear(); }));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Abrir o Clawdesk", false, delegate { if (OpenAppRequested != null) OpenAppRequested(); }));
+            menu.Items.Add(Item(L.T("Abrir o Clawdesk", "Open Clawdesk"), false, delegate { if (OpenAppRequested != null) OpenAppRequested(); }));
             string other = corner == "esquerdo" ? "direito" : "esquerdo";
-            menu.Items.Add(Item("Ficar no canto " + other, false, delegate { SetCorner(other); }));
-            menu.Items.Add(Item("Tirar da barra de tarefas", false, delegate { SetTaskbar(false); }));
-            menu.Items.Add(Item("Sair", false, delegate { if (QuitRequested != null) QuitRequested(); else Application.Current.Shutdown(); }));
+            menu.Items.Add(Item(L.T("Ficar no canto " + other, other == "esquerdo" ? "Move to the left corner" : "Move to the right corner"), false, delegate { SetCorner(other); }));
+            menu.Items.Add(Item(L.T("Tirar da barra de tarefas", "Remove from taskbar"), false, delegate { SetTaskbar(false); }));
+            menu.Items.Add(Item(L.T("Sair", "Quit"), false, delegate { if (QuitRequested != null) QuitRequested(); else Application.Current.Shutdown(); }));
             menu.PlacementTarget = view;
             menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
             menu.IsOpen = true;
@@ -2372,7 +2389,7 @@ namespace Clawdesk
 
         void OpenClaude(Account a)
         {
-            if (a.Main != null) { Say(a.Main, "Abrindo o Claude " + a.Name + "…", 2.2, T); React(a.Main, "greet", 1.4, T); }
+            if (a.Main != null) { Say(a.Main, L.T("Abrindo o Claude ", "Opening Claude ") + a.Name + "…", 2.2, T); React(a.Main, "greet", 1.4, T); }
             try { Profiles.Launch(a.Profile, a.Name); }
             catch (Exception e) { Program.Log("abrir " + a.Key + ": " + e.Message); }
         }
@@ -3405,10 +3422,10 @@ namespace Clawdesk
             {
                 // --eventos: todo mundo livre, para os encontros acontecerem um atrás do outro
                 string[] idle = { "ocioso", "", "" };
-                by[k0].Add(DemoS("u1", k0, "Corrigir o login", festa ? idle : Cases[k % Cases.Length], now, 3, "claude-fable-5-2", 40));
-                by[k0].Add(DemoS("u2", k0, "Revisar o relatório", festa ? idle : Cases[(k + 11) % Cases.Length], now, 2, "claude-opus-5-5", 90));
-                by[k1].Add(DemoS("p1", k1, "Site novo", festa ? idle : Cases[(k + 21) % Cases.Length], now, 3, "claude-sonnet-5-5", 30));
-                if (!festa && (int)(t / 30) % 2 == 0) by[k1].Add(DemoS("p2", k1, "Lista de compras", Cases[(k + 32) % Cases.Length], now, 1, "claude-haiku-5-5", 12));
+                by[k0].Add(DemoS("u1", k0, L.T("Corrigir o login", "Fix the login"), festa ? idle : Cases[k % Cases.Length], now, 3, "claude-fable-5-2", 40));
+                by[k0].Add(DemoS("u2", k0, L.T("Revisar o relatório", "Review the report"), festa ? idle : Cases[(k + 11) % Cases.Length], now, 2, "claude-opus-5-5", 90));
+                by[k1].Add(DemoS("p1", k1, L.T("Site novo", "New website"), festa ? idle : Cases[(k + 21) % Cases.Length], now, 3, "claude-sonnet-5-5", 30));
+                if (!festa && (int)(t / 30) % 2 == 0) by[k1].Add(DemoS("p2", k1, L.T("Lista de compras", "Shopping list"), Cases[(k + 32) % Cases.Length], now, 1, "claude-haiku-5-5", 12));
             }
             foreach (var a in accounts)
             {
@@ -3512,35 +3529,35 @@ namespace Clawdesk
             string a = accounts[0].Key, b = accounts[1].Key;
             Func<string, string> at = n => System.IO.Path.Combine(dir, "clawds-" + n + ".png");
 
-            Scene(Fake(a, "a1", 3, "ocioso", "", "", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "ocioso", "", "", "claude-sonnet-5-5", "Site novo", 0));
+            Scene(Fake(a, "a1", 3, "ocioso", "", "", "claude-opus-5-5", L.T("Corrigir o login", "Fix the login"), 0), Fake(b, "b1", 2, "ocioso", "", "", "claude-sonnet-5-5", L.T("Site novo", "New website"), 0));
             Run(3.4);
-            Scene(Fake(a, "a1", 3, "trabalhando", "Bash", "git", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "trabalhando", "Edit", "codigo", "claude-sonnet-5-5", "Site novo", 0));
+            Scene(Fake(a, "a1", 3, "trabalhando", "Bash", "git", "claude-opus-5-5", L.T("Corrigir o login", "Fix the login"), 0), Fake(b, "b1", 2, "trabalhando", "Edit", "codigo", "claude-sonnet-5-5", L.T("Site novo", "New website"), 0));
             Run(1.3);
             Snap(at("trabalhando"), null);
-            Scene(Fake(a, "a1", 3, "trabalhando", "Bash", "teste", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "trabalhando", "WebSearch", "", "claude-sonnet-5-5", "Site novo", 0));
+            Scene(Fake(a, "a1", 3, "trabalhando", "Bash", "teste", "claude-opus-5-5", L.T("Corrigir o login", "Fix the login"), 0), Fake(b, "b1", 2, "trabalhando", "WebSearch", "", "claude-sonnet-5-5", L.T("Site novo", "New website"), 0));
             Run(2.2);
             Snap(at("testes-web"), null);
-            Scene(Fake(a, "a1", 3, "aguardando", "AskUserQuestion", "", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "pensando", "", "", "claude-sonnet-5-5", "Site novo", 0));
+            Scene(Fake(a, "a1", 3, "aguardando", "AskUserQuestion", "", "claude-opus-5-5", L.T("Corrigir o login", "Fix the login"), 0), Fake(b, "b1", 2, "pensando", "", "", "claude-sonnet-5-5", L.T("Site novo", "New website"), 0));
             Run(1.2);
             Snap(at("esperando"), null);
-            Scene(Fake(a, "a1", 3, "feito", "", "", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "erro", "", "", "claude-sonnet-5-5", "Site novo", 0));
+            Scene(Fake(a, "a1", 3, "feito", "", "", "claude-opus-5-5", L.T("Corrigir o login", "Fix the login"), 0), Fake(b, "b1", 2, "erro", "", "", "claude-sonnet-5-5", L.T("Site novo", "New website"), 0));
             Run(0.75);
             Snap(at("feito-erro"), null);
-            Scene(Fake(a, "a1", 3, "trabalhando", "Agent", "", "claude-fable-5-2", "Corrigir o login", 2), Fake(a, "a2", 1, "trabalhando", "Read", "doc", "claude-haiku-5-5", "Revisar o relatório", 0),
-                  Fake(b, "b1", 2, "trabalhando", "Bash", "compilar", "claude-sonnet-5-5", "Site novo", 0), Fake(b, "b2", 1, "pensando", "", "", "claude-haiku-5-5", "Lista de compras", 0));
+            Scene(Fake(a, "a1", 3, "trabalhando", "Agent", "", "claude-fable-5-2", L.T("Corrigir o login", "Fix the login"), 2), Fake(a, "a2", 1, "trabalhando", "Read", "doc", "claude-haiku-5-5", L.T("Revisar o relatório", "Review the report"), 0),
+                  Fake(b, "b1", 2, "trabalhando", "Bash", "compilar", "claude-sonnet-5-5", L.T("Site novo", "New website"), 0), Fake(b, "b2", 1, "pensando", "", "", "claude-haiku-5-5", L.T("Lista de compras", "Shopping list"), 0));
             Run(3.4);
             Snap(at("filhotes"), null);
             Snap(at("painel"), accounts[0]);
-            var cloud = Fake(a, "a3", 1, "trabalhando", "Bash", "teste", "claude-opus-5-5", "Rodar a suíte na nuvem", 0);
+            var cloud = Fake(a, "a3", 1, "trabalhando", "Bash", "teste", "claude-opus-5-5", L.T("Rodar a suíte na nuvem", "Run the suite in the cloud"), 0);
             cloud.Origin = "nuvem";
-            Scene(Fake(a, "a1", 3, "trabalhando", "Edit", "codigo", "claude-opus-5-5", "Corrigir o login", 0), cloud,
-                  Fake(b, "b1", 2, "pensando", "", "", "claude-sonnet-5-5", "Site novo", 0));
+            Scene(Fake(a, "a1", 3, "trabalhando", "Edit", "codigo", "claude-opus-5-5", L.T("Corrigir o login", "Fix the login"), 0), cloud,
+                  Fake(b, "b1", 2, "pensando", "", "", "claude-sonnet-5-5", L.T("Site novo", "New website"), 0));
             Run(3.4);
             Snap(at("nuvem"), null);
-            Scene(Fake(b, "b1", 2, "encerrada", "", "", "", "Site novo", 0));
+            Scene(Fake(b, "b1", 2, "encerrada", "", "", "", L.T("Site novo", "New website"), 0));
             Run(6);
             Snap(at("descansando"), null);
-            Scene(Fake(a, "a1", 3, "ocioso", "", "", "claude-opus-5-5", "Corrigir o login", 0), Fake(b, "b1", 2, "ocioso", "", "", "claude-sonnet-5-5", "Site novo", 0));
+            Scene(Fake(a, "a1", 3, "ocioso", "", "", "claude-opus-5-5", L.T("Corrigir o login", "Fix the login"), 0), Fake(b, "b1", 2, "ocioso", "", "", "claude-sonnet-5-5", L.T("Site novo", "New website"), 0));
             Run(4);
             festa = true;
             festaIdx = Array.IndexOf(FestaKinds, "ball");
@@ -3674,7 +3691,7 @@ namespace Clawdesk
             var dot = new Rectangle { Width = 8, Height = 8, Fill = a.Ui, Margin = new Thickness(0, 0, 7, 0), VerticalAlignment = VerticalAlignment.Center };
             head.Children.Add(dot);
             int active = a.Active.Count;
-            var count = Tx(active == 0 ? "sem sessões" : active == 1 ? "1 ativa" : active + " ativas", 11, Dim, false);
+            var count = Tx(active == 0 ? L.T("sem sessões", "no sessions") : active == 1 ? L.T("1 ativa", "1 active") : active + L.T(" ativas", " active"), 11, Dim, false);
             DockPanel.SetDock(count, Dock.Right);
             head.Children.Add(count);
             head.Children.Add(Tx("Claude " + a.Name, 13, Text, true));
@@ -3697,7 +3714,7 @@ namespace Clawdesk
                 row.Children.Add(d);
                 string where = s.Origin == "nuvem" ? "☁ " : s.Origin == "outro" ? "⇄ " : "";
                 var label = Tx(where + s.Label, 11.5, s.IsActive(now) ? Text : Dim, false);
-                if (s.IsRemote) label.ToolTip = s.Origin == "nuvem" ? "Sessão na nuvem do claude.ai" : "Sessão em outro computador";
+                if (s.IsRemote) label.ToolTip = s.Origin == "nuvem" ? L.T("Sessão na nuvem do claude.ai", "Session in the claude.ai cloud") : L.T("Sessão em outro computador", "Session on another computer");
                 label.Margin = new Thickness(0, 3, 8, 3);
                 Grid.SetColumn(label, 1);
                 row.Children.Add(label);
@@ -3708,7 +3725,7 @@ namespace Clawdesk
                 row.Children.Add(st);
                 stack.Children.Add(row);
             }
-            if (a.Sessions.Count == 0) stack.Children.Add(Tx("nenhuma sessão hoje", 11, Dim, false));
+            if (a.Sessions.Count == 0) stack.Children.Add(Tx(L.T("nenhuma sessão hoje", "no sessions today"), 11, Dim, false));
 
             // limites: nome, barra, porcentagem e quando reinicia, numa linha
             var limits = a.Usage != null ? a.Usage.Limits : new List<Limit>();
@@ -3740,12 +3757,12 @@ namespace Clawdesk
                 }
                 stack.Children.Add(grid);
             }
-            else stack.Children.Add(Margined(Tx("limites: aparecem após a 1ª resposta", 10.5, Dim, false), 8));
+            else stack.Children.Add(Margined(Tx(L.T("limites: aparecem após a 1ª resposta", "limits: shown after the first reply"), 10.5, Dim, false), 8));
 
             DateTime today = DateTime.Today;
             double todayMs = (today.ToUniversalTime() - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
             var costed = a.Sessions.Where(s => !double.IsNaN(s.Cost) && s.UpdatedAt >= todayMs).ToList();
-            if (costed.Count > 0) stack.Children.Add(Margined(Tx("custo hoje  " + Words.Money(costed.Sum(s => s.Cost)), 11, Dim, false), 6));
+            if (costed.Count > 0) stack.Children.Add(Margined(Tx(L.T("custo hoje  ", "cost today  ") + Words.Money(costed.Sum(s => s.Cost)), 11, Dim, false), 6));
         }
 
         static FrameworkElement Margined(FrameworkElement e, double top)

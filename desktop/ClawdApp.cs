@@ -85,7 +85,7 @@ namespace Clawdesk
                 if (Updater.Available && !updateNoticeShown && Updater.Latest != Cfg.SkipVersion)
                 {
                     updateNoticeShown = true;
-                    Tray.Notify("Versão " + Updater.Latest + " disponível", "Clique para ver o que mudou e atualizar.", delegate { OpenWindow("configuracoes"); });
+                    Tray.Notify(L.T("Versão ", "Version ") + Updater.Latest + L.T(" disponível", " available"), L.T("Clique para ver o que mudou e atualizar.", "Click to see what's new and update."), delegate { OpenWindow("configuracoes"); });
                 }
             };
             Updater.ReadyToQuit += Quit;
@@ -160,7 +160,7 @@ namespace Clawdesk
         {
             if (ModBusy) return;
             ModBusy = true;
-            ModMessage = "Procurando o Claude Code…";
+            ModMessage = L.T("Procurando o Claude Code…", "Looking for Claude Code…");
             if (ModChanged != null) ModChanged();
             var d = Dispatcher.CurrentDispatcher;
             ThreadPool.QueueUserWorkItem(delegate
@@ -183,7 +183,7 @@ namespace Clawdesk
             if (ModBusy) return;
             ModBusy = true;
             var st = Mod;
-            ModMessage = st != null && st.Installed ? "Atualizando o mod…" : "Instalando o mod…";
+            ModMessage = st != null && st.Installed ? L.T("Atualizando o mod…", "Updating the mod…") : L.T("Instalando o mod…", "Installing the mod…");
             if (ModChanged != null) ModChanged();
             var d = Dispatcher.CurrentDispatcher;
             ThreadPool.QueueUserWorkItem(delegate
@@ -195,7 +195,7 @@ namespace Clawdesk
                 {
                     Mod = after;
                     ModBusy = false;
-                    ModMessage = err == null ? "Pronto. Reinicie o Claude para o mod carregar." : "Não deu: " + err;
+                    ModMessage = err == null ? L.T("Pronto. Reinicie o Claude para o mod carregar.", "Done. Restart Claude to load the mod.") : L.T("Não deu: ", "Didn't work: ") + err;
                     if (ModChanged != null) ModChanged();
                 }));
             });
@@ -214,7 +214,7 @@ namespace Clawdesk
                     if (!trayTipShown && Tray != null)
                     {
                         trayTipShown = true;
-                        Tray.Notify("O Clawdesk continua aqui", "Ele fica na bandeja, de olho nas sessões. Para fechar de vez, use Sair no menu do ícone.", null);
+                        Tray.Notify(L.T("O Clawdesk continua aqui", "Clawdesk is still here"), L.T("Ele fica na bandeja, de olho nas sessões. Para fechar de vez, use Sair no menu do ícone.", "It stays in the tray, keeping an eye on your sessions. To close it for good, use Quit in the icon's menu."), null);
                     }
                 };
                 win.Show();
@@ -226,6 +226,28 @@ namespace Clawdesk
             win.Topmost = true;
             win.Topmost = false;
             win.Focus();
+        }
+
+        public void ChangeLanguage(string choice)
+        {
+            if (Cfg.Lang == choice) return;
+            Cfg.Lang = choice;
+            L.Choice = choice;
+            saveTimer.Stop();
+            SaveNow();
+            Restart();
+        }
+
+        // Fecha e abre de novo (para trocar o idioma de tudo de uma vez).
+        public void Restart()
+        {
+            try
+            {
+                string exe = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                Process.Start(new ProcessStartInfo(exe, "--depois " + Process.GetCurrentProcess().Id) { UseShellExecute = true });
+            }
+            catch (Exception e) { Program.Log("reiniciar: " + e.Message); return; }
+            Quit();
         }
 
         public void Quit()
@@ -251,12 +273,12 @@ namespace Clawdesk
             string a = Cfg.Accounts[0].Key, b = Cfg.Accounts[1].Key;
             var fake = new[]
             {
-                Stage.PhotoSession(a, "a1", 3, "trabalhando", "Bash", "teste", "claude-opus-5-5", "Corrigir o login", 0),
-                Stage.PhotoSession(a, "a2", 1, "aguardando", "AskUserQuestion", "", "claude-fable-5-2", "Revisar o relatório", 0),
-                Stage.PhotoSession(b, "b1", 2, "trabalhando", "Edit", "codigo", "claude-sonnet-5-5", "Site novo", 2),
-                Stage.PhotoSession(b, "b2", 1, "pensando", "", "", "claude-haiku-5-5", "Lista de compras", 0),
-                Stage.PhotoSession(b, "b3", 1, "ocioso", "", "", "claude-sonnet-5-5", "Ideias de nomes", 0),
-                Stage.PhotoSession(a, "a3", 2, "feito", "", "", "claude-sonnet-5-5", "Planilha de custos", 0),
+                Stage.PhotoSession(a, "a1", 3, "trabalhando", "Bash", "teste", "claude-opus-5-5", L.T("Corrigir o login", "Fix the login"), 0),
+                Stage.PhotoSession(a, "a2", 1, "aguardando", "AskUserQuestion", "", "claude-fable-5-2", L.T("Revisar o relatório", "Review the report"), 0),
+                Stage.PhotoSession(b, "b1", 2, "trabalhando", "Edit", "codigo", "claude-sonnet-5-5", L.T("Site novo", "New website"), 2),
+                Stage.PhotoSession(b, "b2", 1, "pensando", "", "", "claude-haiku-5-5", L.T("Lista de compras", "Shopping list"), 0),
+                Stage.PhotoSession(b, "b3", 1, "ocioso", "", "", "claude-sonnet-5-5", L.T("Ideias de nomes", "Name ideas"), 0),
+                Stage.PhotoSession(a, "a3", 2, "feito", "", "", "claude-sonnet-5-5", L.T("Planilha de custos", "Cost spreadsheet"), 0),
             };
             w.Go("home");
             w.UpdateLayout();
@@ -299,10 +321,10 @@ namespace Clawdesk
 
         static readonly string[][] Pages =
         {
-            new[] { "home", "Home", Ui.IcHome, "O escritório: cada conta é um setor, cada sessão um Clawd na sua mesa." },
-            new[] { "estatisticas", "Estatísticas", Ui.IcChart, "Quanto o Claude trabalhou, quanto custou e no quê." },
-            new[] { "contas", "Contas", Ui.IcPeople, "As contas do Claude Desktop, o tema de cada uma e o Clawd." },
-            new[] { "configuracoes", "Configurações", Ui.IcSettings, "Clawds, avisos, mod do Claude Code e atualizações." },
+            new[] { "home", "Home", Ui.IcHome, L.T("O escritório: cada conta é um setor, cada sessão um Clawd na sua mesa.", "The office: each account is a department, each session a Clawd at its desk.") },
+            new[] { "estatisticas", L.T("Estatísticas", "Statistics"), Ui.IcChart, L.T("Quanto o Claude trabalhou, quanto custou e no quê.", "How much Claude worked, what it cost and on what.") },
+            new[] { "contas", L.T("Contas", "Accounts"), Ui.IcPeople, L.T("As contas do Claude Desktop, o tema de cada uma e o Clawd.", "Your Claude Desktop accounts, each one's theme and Clawd.") },
+            new[] { "configuracoes", L.T("Configurações", "Settings"), Ui.IcSettings, L.T("Clawds, avisos, mod do Claude Code e atualizações.", "Clawds, notifications, the Claude Code mod and updates.") },
         };
 
         public MainWindow(App a, bool photo)
@@ -345,8 +367,8 @@ namespace Clawdesk
             logo.Margin = new Thickness(-6, 0, 2, 0);
             brand.Children.Add(logo);
             var bt = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            bt.Children.Add(Ui.T("Clawd", 16, Ui.Text, true));
-            bt.Children.Add(Ui.T("Companheiro · " + AppPaths.Version, 11.5, Ui.Faint, false));
+            bt.Children.Add(Ui.T(AppPaths.Name, 16, Ui.Text, true));
+            bt.Children.Add(Ui.T(L.T("versão ", "version ") + AppPaths.Version, 11.5, Ui.Faint, false));
             brand.Children.Add(bt);
             DockPanel.SetDock(brand, Dock.Top);
             side.Children.Add(brand);
@@ -443,9 +465,9 @@ namespace Clawdesk
         {
             var sp = new StackPanel();
             if (app.Updater.Available && app.Updater.Latest != app.Cfg.SkipVersion)
-                sp.Children.Add(FootCard(Ui.IcDownload, "Versão " + app.Updater.Latest, "Clique para atualizar", Ui.Good, delegate { Go("configuracoes"); }));
+                sp.Children.Add(FootCard(Ui.IcDownload, L.T("Versão ", "Version ") + app.Updater.Latest, L.T("Clique para atualizar", "Click to update"), Ui.Good, delegate { Go("configuracoes"); }));
             if (app.Mod != null && !app.Mod.Installed && !app.ModBusy)
-                sp.Children.Add(FootCard(Ui.IcInfo, "Falta o mod", "Sem ele, as sessões não aparecem", Ui.Warn, delegate { Go("configuracoes"); }));
+                sp.Children.Add(FootCard(Ui.IcInfo, L.T("Falta o mod", "The mod is missing"), L.T("Sem ele, as sessões não aparecem", "Without it, sessions don't show up"), Ui.Warn, delegate { Go("configuracoes"); }));
             navFoot.Content = sp;
         }
 
@@ -556,75 +578,81 @@ namespace Clawdesk
 
             // ---- Clawds
             var clawds = new StackPanel();
-            clawds.Children.Add(Ui.Setting("Clawds em cima da barra de tarefas", "Fora da Home, eles ficam no canto da tela. Com a Home aberta, vão trabalhar no escritório.",
+            clawds.Children.Add(Ui.Setting(L.T("Clawds em cima da barra de tarefas", "Clawds above the taskbar"), L.T("Fora da Home, eles ficam no canto da tela. Com a Home aberta, vão trabalhar no escritório.", "Outside Home they sit in the corner of the screen. With Home open, they go work in the office."),
                 Ui.Toggle(c.Taskbar, delegate(bool v) { c.Taskbar = v; Changed(); })));
             clawds.Children.Add(Ui.Divider());
-            clawds.Children.Add(Ui.Setting("Canto da tela", null,
-                Ui.Segmented(new[] { "Esquerdo", "Direito" }, c.Corner == "esquerdo" ? 0 : 1, delegate(int i) { c.Corner = i == 0 ? "esquerdo" : "direito"; Changed(); Refresh(); })));
+            clawds.Children.Add(Ui.Setting(L.T("Canto da tela", "Screen corner"), null,
+                Ui.Segmented(new[] { L.T("Esquerdo", "Left"), L.T("Direito", "Right") }, c.Corner == "esquerdo" ? 0 : 1, delegate(int i) { c.Corner = i == 0 ? "esquerdo" : "direito"; Changed(); Refresh(); })));
             clawds.Children.Add(Ui.Divider());
-            clawds.Children.Add(Ui.Setting("Brincadeiras na barra de tarefas", "De tempo em tempo, os Clawds livres brincam juntos.",
+            clawds.Children.Add(Ui.Setting(L.T("Brincadeiras na barra de tarefas", "Games on the taskbar"), L.T("De tempo em tempo, os Clawds livres brincam juntos.", "Every now and then, idle Clawds play together."),
                 Ui.Toggle(c.Events, delegate(bool v) { c.Events = v; Changed(); })));
             sp.Children.Add(Ui.Section("Clawds", null, clawds));
 
             // ---- avisos
             var n = c.Notify;
             var notif = new StackPanel();
-            notif.Children.Add(Ui.Setting("Avisos do Windows", "Quando uma sessão precisa de você. Não avisa o que você já está vendo: a Home aberta ou o Claude da conta na frente.",
+            notif.Children.Add(Ui.Setting(L.T("Avisos do Windows", "Windows notifications"), L.T("Quando uma sessão precisa de você. Não avisa o que você já está vendo: a Home aberta ou o Claude da conta na frente.", "When a session needs you. It doesn't notify about what you're already looking at: Home open, or that account's Claude in front."),
                 Ui.Toggle(n.On, delegate(bool v) { n.On = v; Changed(); Refresh(); })));
             if (n.On)
             {
                 notif.Children.Add(Ui.Divider());
-                notif.Children.Add(Ui.Setting("Esperando você", "Uma pergunta, um plano para aprovar ou um pedido de permissão.", Ui.Toggle(n.Waiting, delegate(bool v) { n.Waiting = v; Changed(); })));
+                notif.Children.Add(Ui.Setting(L.T("Esperando você", "Waiting for you"), L.T("Uma pergunta, um plano para aprovar ou um pedido de permissão.", "A question, a plan to approve or a permission request."), Ui.Toggle(n.Waiting, delegate(bool v) { n.Waiting = v; Changed(); })));
                 notif.Children.Add(Ui.Divider());
-                notif.Children.Add(Ui.Setting("Terminou", null, Ui.Toggle(n.Done, delegate(bool v) { n.Done = v; Changed(); Refresh(); })));
+                notif.Children.Add(Ui.Setting(L.T("Terminou", "Finished"), null, Ui.Toggle(n.Done, delegate(bool v) { n.Done = v; Changed(); Refresh(); })));
                 if (n.Done)
                 {
                     int[] secs = { 0, 30, 60, 300 };
                     int sel = Array.IndexOf(secs, n.MinSecs);
-                    notif.Children.Add(Ui.Setting("Só tarefas que levaram mais de", "Respostas rápidas não precisam de aviso.",
-                        Ui.Segmented(new[] { "Qualquer", "30 s", "1 min", "5 min" }, sel < 0 ? 1 : sel, delegate(int i) { n.MinSecs = secs[i]; Changed(); Refresh(); })));
+                    notif.Children.Add(Ui.Setting(L.T("Só tarefas que levaram mais de", "Only tasks that took longer than"), L.T("Respostas rápidas não precisam de aviso.", "Quick answers don't need a notification."),
+                        Ui.Segmented(new[] { L.T("Qualquer", "Any"), "30 s", "1 min", "5 min" }, sel < 0 ? 1 : sel, delegate(int i) { n.MinSecs = secs[i]; Changed(); Refresh(); })));
                 }
                 notif.Children.Add(Ui.Divider());
-                notif.Children.Add(Ui.Setting("Deu erro", null, Ui.Toggle(n.Error, delegate(bool v) { n.Error = v; Changed(); })));
+                notif.Children.Add(Ui.Setting(L.T("Deu erro", "Error"), null, Ui.Toggle(n.Error, delegate(bool v) { n.Error = v; Changed(); })));
                 notif.Children.Add(Ui.Divider());
                 double now = Data.NowMs();
                 bool quiet = n.QuietUntil > now;
                 DateTime until = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(n.QuietUntil).ToLocalTime();
                 double tomorrow = (DateTime.Today.AddDays(1).AddHours(8).ToUniversalTime() - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
-                notif.Children.Add(Ui.Setting("Não perturbe", quiet ? "Ligado até " + until.ToString(until.Date == DateTime.Today ? "HH:mm" : "ddd HH:mm", Words.PtBR) + "." : "Pausa os avisos por um tempo.",
-                    Ui.Segmented(new[] { "Desligado", "1 hora", "Até amanhã" }, !quiet ? 0 : Math.Abs(n.QuietUntil - tomorrow) < 1000 ? 2 : 1,
+                notif.Children.Add(Ui.Setting(L.T("Não perturbe", "Do not disturb"), quiet ? L.T("Ligado até ", "On until ") + until.ToString(until.Date == DateTime.Today ? "HH:mm" : "ddd HH:mm", L.Culture) + "." : L.T("Pausa os avisos por um tempo.", "Pauses notifications for a while."),
+                    Ui.Segmented(new[] { L.T("Desligado", "Off"), L.T("1 hora", "1 hour"), L.T("Até amanhã", "Until tomorrow") }, !quiet ? 0 : Math.Abs(n.QuietUntil - tomorrow) < 1000 ? 2 : 1,
                         delegate(int i) { n.QuietUntil = i == 0 ? 0 : i == 1 ? Data.NowMs() + 3600000 : tomorrow; Changed(); Refresh(); })));
             }
-            sp.Children.Add(Ui.Section("Avisos", null, notif));
+            sp.Children.Add(Ui.Section(L.T("Avisos", "Notifications"), null, notif));
 
             // ---- mod
-            sp.Children.Add(Ui.Section("Mod do Claude Code", "É o mod que conta para o app o que cada sessão está fazendo, aplica o tema de cada conta e põe um Clawd dentro do Claude.", BuildMod()));
+            sp.Children.Add(Ui.Section(L.T("Mod do Claude Code", "Claude Code mod"), L.T("É o mod que conta para o app o que cada sessão está fazendo, aplica o tema de cada conta e põe um Clawd dentro do Claude.", "The mod tells the app what each session is doing, applies each account's theme and puts a Clawd inside Claude."), BuildMod()));
 
             // ---- sessões de fora deste PC
-            sp.Children.Add(Ui.Section("Nuvem e outros PCs", "Sessões na nuvem do claude.ai (app, web, celular, tarefas agendadas) e em outros computadores também aparecem, com uma nuvenzinha. Elas mandam o estado para um Gist secreto do GitHub, e o app lê de lá a cada 15 segundos.", BuildRelay(c)));
+            sp.Children.Add(Ui.Section(L.T("Nuvem e outros PCs", "Cloud and other PCs"), L.T("Sessões na nuvem do claude.ai (app, web, celular, tarefas agendadas) e em outros computadores também aparecem, com uma nuvenzinha. Elas mandam o estado para um Gist secreto do GitHub, e o app lê de lá a cada 15 segundos.", "Sessions in the claude.ai cloud (app, web, phone, scheduled tasks) and on other computers show up too, with a little cloud. They send their status to a secret GitHub Gist, and the app reads it every 15 seconds."), BuildRelay(c)));
 
             // ---- inicialização e atualizações
             var sys = new StackPanel();
             bool startup = AppPaths.StartsWithWindows;
-            sys.Children.Add(Ui.Setting("Abrir com o Windows", "Começa em segundo plano, na bandeja, sem abrir a janela.",
+            sys.Children.Add(Ui.Setting(L.T("Abrir com o Windows", "Start with Windows"), L.T("Começa em segundo plano, na bandeja, sem abrir a janela.", "Starts in the background, in the tray, without opening the window."),
                 Ui.Toggle(startup, delegate(bool v)
                 {
                     try { AppPaths.SetStartup(v, System.Reflection.Assembly.GetExecutingAssembly().Location); }
                     catch (Exception e) { MessageBox.Show(Window.GetWindow(this), e.Message, AppPaths.Name); }
                 })));
             sys.Children.Add(Ui.Divider());
-            sys.Children.Add(Ui.Setting("Procurar atualizações sozinho", "Uma vez ao abrir e depois a cada 12 horas, no GitHub do projeto.",
+            sys.Children.Add(Ui.Setting(L.T("Procurar atualizações sozinho", "Check for updates automatically"), L.T("Uma vez ao abrir e depois a cada 12 horas, no GitHub do projeto.", "Once at startup and then every 12 hours, on the project's GitHub."),
                 Ui.Toggle(c.CheckUpdates, delegate(bool v) { c.CheckUpdates = v; Changed(); })));
             sys.Children.Add(Ui.Divider());
             sys.Children.Add(BuildUpdate());
-            sp.Children.Add(Ui.Section("Sistema", null, sys));
+            sp.Children.Add(Ui.Section(L.T("Sistema", "System"), null, sys));
+
+            // ---- idioma
+            int lang = c.Lang == "pt" ? 1 : c.Lang == "en" ? 2 : 0;
+            sp.Children.Add(Ui.Section(L.T("Idioma", "Language"), null, Ui.Setting(L.T("Idioma do app", "App language"),
+                L.T("Automático segue o idioma do Windows. Trocar reinicia o Clawdesk.", "Automatic follows the Windows language. Changing it restarts Clawdesk."),
+                Ui.Segmented(new[] { L.T("Automático", "Automatic"), "Português", "English" }, lang, delegate(int i) { app.ChangeLanguage(i == 1 ? "pt" : i == 2 ? "en" : "auto"); }))));
 
             // ---- dados
             var data = new WrapPanel();
-            data.Children.Add(Ui.Button(Ui.IcFolder, "Pasta de dados", null, delegate { Open(Cfg.Dir); }));
-            data.Children.Add(Ui.Button(Ui.IcFolder, "Pasta de skins", null, delegate { Skin.WriteGuide(Cfg.SkinsDir); Open(Cfg.SkinsDir); }));
-            data.Children.Add(Ui.Button(Ui.IcOpen, "Página do projeto", null, delegate { Open("https://github.com/" + AppPaths.Repo); }));
-            sp.Children.Add(Ui.Section("Dados e privacidade", "Tudo fica nesta máquina, em .claude\\clawd: as escolhas, o histórico e o estado das sessões (nunca os comandos, caminhos ou conteúdo). Nada é enviado para fora, além da consulta de versão nova no GitHub.", data));
+            data.Children.Add(Ui.Button(Ui.IcFolder, L.T("Pasta de dados", "Data folder"), null, delegate { Open(Cfg.Dir); }));
+            data.Children.Add(Ui.Button(Ui.IcFolder, L.T("Pasta de skins", "Skins folder"), null, delegate { Skin.WriteGuide(Cfg.SkinsDir); Open(Cfg.SkinsDir); }));
+            data.Children.Add(Ui.Button(Ui.IcOpen, L.T("Página do projeto", "Project page"), null, delegate { Open("https://github.com/" + AppPaths.Repo); }));
+            sp.Children.Add(Ui.Section(L.T("Dados e privacidade", "Data and privacy"), L.T("Tudo fica nesta máquina, em .claude\\clawd: as escolhas, o histórico e o estado das sessões (nunca os comandos, caminhos ou conteúdo). Nada é enviado para fora, além da consulta de versão nova no GitHub.", "Everything stays on this machine, in .claude\\clawd: your choices, the history and the session status (never commands, paths or content). Nothing is sent out, except the new-version check on GitHub."), data));
 
             Content = sp;
         }
@@ -660,42 +688,42 @@ namespace Clawdesk
         UIElement BuildRelay(Cfg c)
         {
             var sp = new StackPanel();
-            sp.Children.Add(Para("1. Crie um Gist secreto com qualquer arquivo (por exemplo LEIA-ME.md) e cole aqui o endereço ou o ID dele."));
+            sp.Children.Add(Para(L.T("1. Crie um Gist secreto com qualquer arquivo (por exemplo LEIA-ME.md) e cole aqui o endereço ou o ID dele.", "1. Create a secret Gist with any file (for example README.md) and paste its address or ID here.")));
             var idBox = new TextBox { Text = c.GistId, FontFamily = Ui.Mono, FontSize = 13, Padding = new Thickness(10, 7, 10, 7), Background = Ui.Soft, Foreground = Ui.Text, CaretBrush = Ui.Text, BorderBrush = Ui.Line, MinWidth = 320, MaxWidth = 460, HorizontalAlignment = HorizontalAlignment.Left };
             var idWarn = Ui.T("", 12, Ui.Warn, false);
             idWarn.Margin = new Thickness(0, 6, 0, 10);
             Action checkId = delegate
             {
                 bool bad = c.GistId.Length > 0 && !c.HasRelay;
-                idWarn.Text = bad ? "Isso não parece o ID de um Gist (letras de a a f e números)." : "";
+                idWarn.Text = bad ? L.T("Isso não parece o ID de um Gist (letras de a a f e números).", "That doesn't look like a Gist ID (letters a to f and digits).") : "";
                 idWarn.Visibility = bad ? Visibility.Visible : Visibility.Collapsed;
             };
             idBox.TextChanged += delegate { c.GistId = GistIdOf(idBox.Text); checkId(); Changed(); };
             sp.Children.Add(idBox);
             sp.Children.Add(idWarn);
             checkId();
-            sp.Children.Add(Para("2. Crie um token do GitHub só com a permissão \"gist\" e cole aqui. Ele fica em nuvem.json, nesta máquina, e serve para o app ler o Gist sem esbarrar no limite do GitHub."));
+            sp.Children.Add(Para(L.T("2. Crie um token do GitHub só com a permissão \"gist\" e cole aqui. Ele fica em nuvem.json, nesta máquina, e serve para o app ler o Gist sem esbarrar no limite do GitHub.", "2. Create a GitHub token with only the \"gist\" permission and paste it here. It stays in nuvem.json, on this machine, and lets the app read the Gist without hitting GitHub's rate limit.")));
             var tok = new PasswordBox { Password = c.GistToken, FontFamily = Ui.Mono, FontSize = 13, Padding = new Thickness(10, 7, 10, 7), Background = Ui.Soft, Foreground = Ui.Text, CaretBrush = Ui.Text, BorderBrush = Ui.Line, MinWidth = 320, MaxWidth = 460, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 10) };
             tok.PasswordChanged += delegate { c.GistToken = tok.Password.Trim(); Changed(); };
             sp.Children.Add(tok);
             var links = new WrapPanel { Margin = new Thickness(0, 0, 0, 14) };
-            links.Children.Add(Ui.Button(Ui.IcOpen, "Criar o Gist", null, delegate { Open("https://gist.github.com/"); }));
-            links.Children.Add(Ui.Button(Ui.IcOpen, "Criar o token", null, delegate { Open("https://github.com/settings/tokens/new?scopes=gist&description=Clawd%20Companheiro"); }));
+            links.Children.Add(Ui.Button(Ui.IcOpen, L.T("Criar o Gist", "Create the Gist"), null, delegate { Open("https://gist.github.com/"); }));
+            links.Children.Add(Ui.Button(Ui.IcOpen, L.T("Criar o token", "Create the token"), null, delegate { Open("https://github.com/settings/tokens/new?scopes=gist&description=Clawdesk"); }));
             sp.Children.Add(links);
-            sp.Children.Add(Para("Secreto não quer dizer trancado: quem tiver o endereço lê. Vão para lá o assunto de cada sessão, o nome da pasta, o estado, o modelo e o e-mail da conta, nunca comandos, caminhos ou conteúdo."));
+            sp.Children.Add(Para(L.T("Secreto não quer dizer trancado: quem tiver o endereço lê. Vão para lá o assunto de cada sessão, o nome da pasta, o estado, o modelo e o e-mail da conta, nunca comandos, caminhos ou conteúdo.", "Secret doesn't mean locked: anyone with the address can read it. It gets each session's topic, folder name, status, model and account email, never commands, paths or content.")));
 
-            string id = c.HasRelay ? c.GistId : "<id do gist>";
-            var cloud = Ui.T("Na nuvem", 13.5, Ui.Text, true);
+            string id = c.HasRelay ? c.GistId : L.T("<id do gist>", "<gist id>");
+            var cloud = Ui.T(L.T("Na nuvem", "In the cloud"), 13.5, Ui.Text, true);
             cloud.Margin = new Thickness(0, 10, 0, 6);
             sp.Children.Add(cloud);
-            sp.Children.Add(Para("No ambiente da nuvem que as sessões usam (claude.ai/code, Configurações do ambiente): a variável abaixo, a rede com api.github.com liberado e um segredo de rede para api.github.com com o token (cabeçalho Authorization: Bearer), para o token não ficar dentro do container. O mod precisa estar ligado nessas sessões."));
+            sp.Children.Add(Para(L.T("No ambiente da nuvem que as sessões usam (claude.ai/code, Configurações do ambiente): a variável abaixo, a rede com api.github.com liberado e um segredo de rede para api.github.com com o token (cabeçalho Authorization: Bearer), para o token não ficar dentro do container. O mod precisa estar ligado nessas sessões.", "In the cloud environment your sessions use (claude.ai/code, environment settings): the variable below, network access with api.github.com allowed, and a network secret for api.github.com with the token (Authorization: Bearer header), so the token doesn't live inside the container. The mod must be enabled in those sessions.")));
             sp.Children.Add(CodeBox("CLAWD_GIST_ID=" + id));
-            var other = Ui.T("Em outro computador", 13.5, Ui.Text, true);
+            var other = Ui.T(L.T("Em outro computador", "On another computer"), 13.5, Ui.Text, true);
             other.Margin = new Thickness(0, 10, 0, 6);
             sp.Children.Add(other);
-            sp.Children.Add(Para("Num computador sem o app (Mac, Linux, outro Windows), com o mod instalado no Claude Code, defina antes de abrir o Claude:"));
-            sp.Children.Add(CodeBox("CLAWD_GIST_ID=" + id + "\nCLAWD_GITHUB_TOKEN=<o token>"));
-            sp.Children.Add(Para("Num Windows que também tem o app, as sessões só aparecem nele; para mandar ao Gist mesmo assim, defina CLAWD_RELAY=1. CLAWD_RELAY=0 desliga o envio em qualquer máquina."));
+            sp.Children.Add(Para(L.T("Num computador sem o app (Mac, Linux, outro Windows), com o mod instalado no Claude Code, defina antes de abrir o Claude:", "On a computer without the app (Mac, Linux, another Windows), with the mod installed in Claude Code, set before opening Claude:")));
+            sp.Children.Add(CodeBox("CLAWD_GIST_ID=" + id + L.T("\nCLAWD_GITHUB_TOKEN=<o token>", "\nCLAWD_GITHUB_TOKEN=<the token>")));
+            sp.Children.Add(Para(L.T("Num Windows que também tem o app, as sessões só aparecem nele; para mandar ao Gist mesmo assim, defina CLAWD_RELAY=1. CLAWD_RELAY=0 desliga o envio em qualquer máquina.", "On a Windows PC that also has the app, sessions only show up there; to send them to the Gist anyway, set CLAWD_RELAY=1. CLAWD_RELAY=0 turns sending off on any machine.")));
             return sp;
         }
 
@@ -710,16 +738,16 @@ namespace Clawdesk
             var st = app.Mod;
             string state;
             Brush color;
-            if (app.ModBusy || st == null) { state = app.ModMessage ?? "Verificando…"; color = Ui.Info; }
-            else if (st.Claude == null) { state = "Não achei o Claude Code neste computador."; color = Ui.Warn; }
-            else if (st.Installed) { state = "Instalado" + (st.Version.Length > 0 ? ", versão " + st.Version : "") + "."; color = Ui.Good; }
-            else { state = st.Error != null ? "Não consegui conferir: " + st.Error : "Ainda não instalado."; color = Ui.Warn; }
+            if (app.ModBusy || st == null) { state = app.ModMessage ?? L.T("Verificando…", "Checking…"); color = Ui.Info; }
+            else if (st.Claude == null) { state = L.T("Não achei o Claude Code neste computador.", "Claude Code was not found on this computer."); color = Ui.Warn; }
+            else if (st.Installed) { state = L.T("Instalado", "Installed") + (st.Version.Length > 0 ? L.T(", versão ", ", version ") + st.Version : "") + "."; color = Ui.Good; }
+            else { state = st.Error != null ? L.T("Não consegui conferir: ", "Couldn't check: ") + st.Error : L.T("Ainda não instalado.", "Not installed yet."); color = Ui.Warn; }
             var row = new DockPanel();
             var btns = new StackPanel { Orientation = Orientation.Horizontal };
             if (st != null && st.Claude != null && !app.ModBusy)
-                btns.Children.Add(Ui.Button(Ui.IcDownload, st.Installed ? "Atualizar o mod" : "Instalar o mod", st.Installed ? null : Ui.Accent, delegate { app.InstallMod(); }));
+                btns.Children.Add(Ui.Button(Ui.IcDownload, st.Installed ? L.T("Atualizar o mod", "Update the mod") : L.T("Instalar o mod", "Install the mod"), st.Installed ? null : Ui.Accent, delegate { app.InstallMod(); }));
             var again = Ui.Button(Ui.IcSync, "", null, delegate { app.CheckMod(); });
-            again.ToolTip = "Conferir de novo";
+            again.ToolTip = L.T("Conferir de novo", "Check again");
             again.Margin = new Thickness(0);
             if (!app.ModBusy) btns.Children.Add(again);
             DockPanel.SetDock(btns, Dock.Right);
@@ -728,14 +756,14 @@ namespace Clawdesk
             sp.Children.Add(row);
             if (!app.ModBusy && app.ModMessage != null)
             {
-                var m = Ui.T(app.ModMessage, 12.5, app.ModMessage.StartsWith("Pronto") ? Ui.Good : Ui.Warn, false);
+                var m = Ui.T(app.ModMessage, 12.5, app.ModMessage.StartsWith(L.T("Pronto", "Done")) ? Ui.Good : Ui.Warn, false);
                 m.Margin = new Thickness(0, 10, 0, 0);
                 sp.Children.Add(m);
             }
-            var hint = Ui.T("Também dá para instalar por dentro do Claude Code, com o comando abaixo (clique para copiar):", 12, Ui.Dim, false);
+            var hint = Ui.T(L.T("Também dá para instalar por dentro do Claude Code, com o comando abaixo (clique para copiar):", "You can also install it from inside Claude Code with the command below (click to copy):"), 12, Ui.Dim, false);
             hint.Margin = new Thickness(0, 14, 0, 6);
             sp.Children.Add(hint);
-            var line = new Border { Background = Ui.Soft, CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 8, 12, 9), Cursor = Cursors.Hand, ToolTip = "Copiar", HorizontalAlignment = HorizontalAlignment.Left };
+            var line = new Border { Background = Ui.Soft, CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 8, 12, 9), Cursor = Cursors.Hand, ToolTip = L.T("Copiar", "Copy"), HorizontalAlignment = HorizontalAlignment.Left };
             var lt = Ui.T(ModTool.ManualLine, 12, Ui.Text, false);
             lt.FontFamily = Ui.Mono;
             line.Child = lt;
@@ -745,7 +773,7 @@ namespace Clawdesk
                 {
                     Clipboard.SetText(ModTool.ManualLine);
                     var w = Window.GetWindow(this) as MainWindow;
-                    if (w != null) w.Toast("Comando copiado.");
+                    if (w != null) w.Toast(L.T("Comando copiado.", "Command copied."));
                 }
                 catch { }
             };
@@ -760,8 +788,8 @@ namespace Clawdesk
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var left = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            left.Children.Add(Ui.T("Versão " + AppPaths.Version, 13.5, Ui.Text, false));
-            string note = u.Status.Length > 0 ? u.Status : u.LastCheck > DateTime.MinValue ? "Última busca às " + u.LastCheck.ToString("HH:mm") + "." : "Ainda não procurei hoje.";
+            left.Children.Add(Ui.T(L.T("Versão ", "Version ") + AppPaths.Version, 13.5, Ui.Text, false));
+            string note = u.Status.Length > 0 ? u.Status : u.LastCheck > DateTime.MinValue ? L.T("Última busca às ", "Last checked at ") + u.LastCheck.ToString("HH:mm") + "." : L.T("Ainda não procurei hoje.", "Haven't checked yet today.");
             var nt = Ui.T(note, 12, u.Available ? Ui.Good : Ui.Dim, false);
             nt.Margin = new Thickness(0, 2, 0, 0);
             left.Children.Add(nt);
@@ -775,11 +803,11 @@ namespace Clawdesk
             var btns = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top };
             if (u.Available && !u.Installing)
             {
-                btns.Children.Add(Ui.Button(Ui.IcDownload, "Atualizar agora", Ui.Accent, delegate { u.Install(); }));
+                btns.Children.Add(Ui.Button(Ui.IcDownload, L.T("Atualizar agora", "Update now"), Ui.Accent, delegate { u.Install(); }));
                 if (u.Latest != app.Cfg.SkipVersion)
-                    btns.Children.Add(Ui.Button("Pular esta versão", null, delegate { app.Cfg.SkipVersion = u.Latest; app.Changed(); app.SyncTray(); Refresh(); }));
+                    btns.Children.Add(Ui.Button(L.T("Pular esta versão", "Skip this version"), null, delegate { app.Cfg.SkipVersion = u.Latest; app.Changed(); app.SyncTray(); Refresh(); }));
             }
-            else if (!u.Checking && !u.Installing) btns.Children.Add(Ui.Button(Ui.IcSync, "Procurar agora", null, delegate { u.Check(true); }));
+            else if (!u.Checking && !u.Installing) btns.Children.Add(Ui.Button(Ui.IcSync, L.T("Procurar agora", "Check now"), null, delegate { u.Check(true); }));
             Grid.SetColumn(btns, 1);
             g.Children.Add(btns);
             return g;
@@ -809,6 +837,20 @@ namespace Clawdesk
         {
             Directory.CreateDirectory(AppPaths.DataDir);
             Func<string, bool> has = name => args.Any(a => a.TrimStart('-', '/').Equals(name, StringComparison.OrdinalIgnoreCase));
+            L.LoadChoice();
+            // --idioma pt|en força o idioma (as fotos do README saem em inglês assim)
+            int li = Array.FindIndex(args, a => a.TrimStart('-', '/').Equals("idioma", StringComparison.OrdinalIgnoreCase));
+            if (li >= 0 && li + 1 < args.Length) L.Choice = args[li + 1];
+            // --depois <pid>: reinício (troca de idioma); espera a cópia anterior fechar
+            int wi = Array.FindIndex(args, a => a.TrimStart('-', '/').Equals("depois", StringComparison.OrdinalIgnoreCase));
+            if (wi >= 0 && wi + 1 < args.Length)
+            {
+                int pid;
+                if (int.TryParse(args[wi + 1], out pid))
+                {
+                    try { Process.GetProcessById(pid).WaitForExit(15000); } catch { }
+                }
+            }
             bool festa = has("eventos");
             bool demo = festa || has("demo");
             bool background = has("fundo");

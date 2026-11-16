@@ -128,14 +128,14 @@ namespace Clawdesk
         public static readonly string[][] Presets =
         {
             new[] { "Claude", "#d97757", "#c8643f", "#c9801a", "#2f8a5b", "#c23b32", "#7a5cd6" },
-            new[] { "Oceano", "#1094ab", "#1094ab", "#fcb421", "#2f8a5b", "#c23b32", "#3f6db3" },
-            new[] { "Violeta", "#8b30e6", "#8b30e6", "#c9801a", "#3d8b5f", "#c23a4b", "#d03fe0" },
-            new[] { "Floresta", "#2f9e6b", "#2f9e6b", "#d9a21b", "#3d8b5f", "#c2412f", "#3f6db3" },
-            new[] { "Rosa", "#e0559a", "#e0559a", "#d9901b", "#3d8b5f", "#c23a4b", "#8a5cf6" },
-            new[] { "Âmbar", "#c9801a", "#c9801a", "#e0a020", "#3d8b5f", "#c2412f", "#3f6db3" },
-            new[] { "Vinho", "#a3324a", "#a3324a", "#c9801a", "#3d8b5f", "#d0453a", "#8a5cf6" },
-            new[] { "Céu", "#3f7fe0", "#3f7fe0", "#d9a21b", "#2f8a5b", "#c23b32", "#8a5cf6" },
-            new[] { "Grafite", "#6b7280", "#7a7f8a", "#c9801a", "#3d8b5f", "#c23b32", "#3f6db3" },
+            new[] { L.T("Oceano", "Ocean"), "#1094ab", "#1094ab", "#fcb421", "#2f8a5b", "#c23b32", "#3f6db3" },
+            new[] { L.T("Violeta", "Violet"), "#8b30e6", "#8b30e6", "#c9801a", "#3d8b5f", "#c23a4b", "#d03fe0" },
+            new[] { L.T("Floresta", "Forest"), "#2f9e6b", "#2f9e6b", "#d9a21b", "#3d8b5f", "#c2412f", "#3f6db3" },
+            new[] { L.T("Rosa", "Pink"), "#e0559a", "#e0559a", "#d9901b", "#3d8b5f", "#c23a4b", "#8a5cf6" },
+            new[] { L.T("Âmbar", "Amber"), "#c9801a", "#c9801a", "#e0a020", "#3d8b5f", "#c2412f", "#3f6db3" },
+            new[] { L.T("Vinho", "Wine"), "#a3324a", "#a3324a", "#c9801a", "#3d8b5f", "#d0453a", "#8a5cf6" },
+            new[] { L.T("Céu", "Sky"), "#3f7fe0", "#3f7fe0", "#d9a21b", "#2f8a5b", "#c23b32", "#8a5cf6" },
+            new[] { L.T("Grafite", "Graphite"), "#6b7280", "#7a7f8a", "#c9801a", "#3d8b5f", "#c23b32", "#3f6db3" },
         };
 
         readonly Func<Cfg> cfg;
@@ -217,8 +217,8 @@ namespace Clawdesk
         string StatusText(AccountCfg a)
         {
             int n = ActiveOf(a);
-            string sessions = n == 0 ? "" : n == 1 ? " · 1 sessão ativa" : " · " + n + " sessões ativas";
-            return (IsRunning(a) ? "aberto" : "fechado") + sessions;
+            string sessions = n == 0 ? "" : n == 1 ? L.T(" · 1 sessão ativa", " · 1 active session") : " · " + n + L.T(" sessões ativas", " active sessions");
+            return (IsRunning(a) ? L.T("aberto", "open") : L.T("fechado", "closed")) + sessions;
         }
 
         void BlinkAll()
@@ -252,16 +252,16 @@ namespace Clawdesk
             root.Children.Add(BuildSwitcher(c, sel));
             if (sel == null)
             {
-                root.Children.Add(Ui.Section("Nenhuma conta do Claude encontrada", "Instale o Claude Desktop e entre com a sua conta; ela aparece aqui sozinha.", null));
+                root.Children.Add(Ui.Section(L.T("Nenhuma conta do Claude encontrada", "No Claude account found"), L.T("Instale o Claude Desktop e entre com a sua conta; ela aparece aqui sozinha.", "Install Claude Desktop and sign in; your account shows up here on its own."), null));
                 return;
             }
             root.Children.Add(BuildHeader(sel));
-            var tabs = Ui.Segmented(new[] { "Geral", "Tema do Claude", "Clawd" }, tab, delegate(int i) { tab = i; Render(); });
+            var tabs = Ui.Segmented(new[] { L.T("Geral", "General"), L.T("Tema do Claude", "Claude theme"), "Clawd" }, tab, delegate(int i) { tab = i; Render(); });
             tabs.Margin = new Thickness(0, 0, 0, 16);
             root.Children.Add(tabs);
             if (tab == 0) BuildGeneral(c, sel);
-            else if (tab == 1) root.Children.Add(Ui.Section("Tema do Claude", "As cores do app nesta conta. Sessões abertas trocam em alguns segundos.", BuildTheme(sel)));
-            else root.Children.Add(Ui.Section("Clawd", "O mascote desta conta: na barra de tarefas e na Home.", BuildClawd(sel)));
+            else if (tab == 1) root.Children.Add(Ui.Section(L.T("Tema do Claude", "Claude theme"), L.T("As cores do app nesta conta. Sessões abertas trocam em alguns segundos.", "The app colors for this account. Open sessions switch within a few seconds."), BuildTheme(sel)));
+            else root.Children.Add(Ui.Section("Clawd", L.T("O mascote desta conta: na barra de tarefas e na Home.", "This account's mascot: on the taskbar and in Home."), BuildClawd(sel)));
         }
 
         // As contas lado a lado, cada uma com o seu Clawd.
@@ -302,12 +302,12 @@ namespace Clawdesk
                 var ic = Ui.Icon(Ui.IcAdd, 13, Ui.Dim);
                 ic.Margin = new Thickness(0, 1, 8, 0);
                 pr.Children.Add(ic);
-                pr.Children.Add(Ui.T("Nova conta", 13, Ui.Dim, false));
+                pr.Children.Add(Ui.T(L.T("Nova conta", "New account"), 13, Ui.Dim, false));
                 plus.Child = pr;
                 plus.MouseEnter += delegate { plus.Background = Ui.Card; };
                 plus.MouseLeave += delegate { plus.Background = Brushes.Transparent; };
                 plus.MouseLeftButtonUp += delegate { AddAccount(); };
-                plus.ToolTip = "Cria um perfil novo do Claude Desktop pelo Claude Profile Switcher.";
+                plus.ToolTip = L.T("Cria um perfil novo do Claude Desktop pelo Claude Profile Switcher.", "Creates a new Claude Desktop profile through Claude Profile Switcher.");
                 wrap.Children.Add(plus);
             }
             return wrap;
@@ -317,17 +317,17 @@ namespace Clawdesk
         {
             var head = new DockPanel { Margin = new Thickness(0, 0, 0, 14) };
             var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            actions.Children.Add(Ui.Button(Ui.IcOpen, IsRunning(a) ? "Mostrar o Claude" : "Abrir o Claude", a.Accent, delegate { Try(delegate { Profiles.Launch(a.Profile, a.Name); }); }));
-            if (IsRunning(a)) actions.Children.Add(Ui.Button(Ui.IcClose, "Fechar", null, delegate { CloseInstance(a); }));
-            var folder = Ui.Button(Ui.IcFolder, "Pasta", null, delegate { OpenFolder(a); });
+            actions.Children.Add(Ui.Button(Ui.IcOpen, IsRunning(a) ? L.T("Mostrar o Claude", "Show Claude") : L.T("Abrir o Claude", "Open Claude"), a.Accent, delegate { Try(delegate { Profiles.Launch(a.Profile, a.Name); }); }));
+            if (IsRunning(a)) actions.Children.Add(Ui.Button(Ui.IcClose, L.T("Fechar", "Close"), null, delegate { CloseInstance(a); }));
+            var folder = Ui.Button(Ui.IcFolder, L.T("Pasta", "Folder"), null, delegate { OpenFolder(a); });
             folder.Margin = new Thickness(0);
-            folder.ToolTip = "Abre a pasta de dados deste perfil no Explorador.";
+            folder.ToolTip = L.T("Abre a pasta de dados deste perfil no Explorador.", "Opens this profile's data folder in Explorer.");
             actions.Children.Add(folder);
             DockPanel.SetDock(actions, Dock.Right);
             head.Children.Add(actions);
             var name = new StackPanel();
             name.Children.Add(Ui.T("Claude " + a.Name, 22, Ui.Text, true));
-            name.Children.Add(Ui.T(StatusText(a) + "  ·  perfil " + a.Profile, 12.5, Ui.Dim, false));
+            name.Children.Add(Ui.T(StatusText(a) + L.T("  ·  perfil ", "  ·  profile ") + a.Profile, 12.5, Ui.Dim, false));
             head.Children.Add(name);
             return head;
         }
@@ -359,30 +359,30 @@ namespace Clawdesk
             who.Children.Add(box);
             who.Children.Add(warn);
             check();
-            root.Children.Add(Ui.Section("E-mails desta conta",
-                "É por aqui que cada sessão descobre de qual conta é. Escreva domínios (empresa.com) ou e-mails inteiros, separados por vírgula. Um * pega todos os outros.", who));
+            root.Children.Add(Ui.Section(L.T("E-mails desta conta", "This account's emails"),
+                L.T("É por aqui que cada sessão descobre de qual conta é. Escreva domínios (empresa.com) ou e-mails inteiros, separados por vírgula. Um * pega todos os outros.", "This is how each session finds out which account it belongs to. Enter domains (company.com) or full emails, separated by commas. A * catches everything else."), who));
 
             var more = new StackPanel();
-            more.Children.Add(Ui.Setting("Clawd desta conta", "Mostrar o mascote desta conta na barra de tarefas e na Home.", Ui.Toggle(a.ShowClawd, delegate(bool v) { a.ShowClawd = v; Changed(true); })));
+            more.Children.Add(Ui.Setting(L.T("Clawd desta conta", "This account's Clawd"), L.T("Mostrar o mascote desta conta na barra de tarefas e na Home.", "Show this account's mascot on the taskbar and in Home."), Ui.Toggle(a.ShowClawd, delegate(bool v) { a.ShowClawd = v; Changed(true); })));
             more.Children.Add(Ui.Divider());
-            more.Children.Add(Ui.Setting("Tema próprio no Claude", a.ThemeOn ? "Ligado. As cores ficam na aba Tema do Claude." : "Desligado: o app fica com as cores normais.", Ui.Toggle(a.ThemeOn, delegate(bool v) { a.ThemeOn = v; Changed(true); })));
+            more.Children.Add(Ui.Setting(L.T("Tema próprio no Claude", "Custom Claude theme"), a.ThemeOn ? L.T("Ligado. As cores ficam na aba Tema do Claude.", "On. Colors are in the Claude theme tab.") : L.T("Desligado: o app fica com as cores normais.", "Off: the app keeps its normal colors."), Ui.Toggle(a.ThemeOn, delegate(bool v) { a.ThemeOn = v; Changed(true); })));
             if (Profiles.HasSwitcher || photo)
             {
                 more.Children.Add(Ui.Divider());
-                var sw = Ui.Button("Abrir o Switcher…", null, delegate { Try(Profiles.OpenSwitcher); });
+                var sw = Ui.Button(L.T("Abrir o Switcher…", "Open Switcher…"), null, delegate { Try(Profiles.OpenSwitcher); });
                 sw.Margin = new Thickness(0);
-                more.Children.Add(Ui.Setting("Nome, atalhos e pasta do perfil", "Quem cuida disso é o Claude Profile Switcher: renomear ou apagar a conta é por lá.", sw));
+                more.Children.Add(Ui.Setting(L.T("Nome, atalhos e pasta do perfil", "Profile name, shortcuts and folder"), L.T("Quem cuida disso é o Claude Profile Switcher: renomear ou apagar a conta é por lá.", "Claude Profile Switcher handles this: rename or delete the account there."), sw));
             }
             root.Children.Add(Ui.Section(null, null, more));
             if (!Profiles.HasSwitcher && !photo)
-                root.Children.Add(Ui.Section("Mais de uma conta", "Para ter várias contas do Claude Desktop abertas ao mesmo tempo, instale o Claude Profile Switcher. Com ele, cada perfil vira uma conta aqui.", null));
+                root.Children.Add(Ui.Section(L.T("Mais de uma conta", "More than one account"), L.T("Para ter várias contas do Claude Desktop abertas ao mesmo tempo, instale o Claude Profile Switcher. Com ele, cada perfil vira uma conta aqui.", "To have several Claude Desktop accounts open at once, install Claude Profile Switcher. Each profile then becomes an account here."), null));
         }
 
         static string EmailWarning(Cfg c, AccountCfg a)
         {
-            if (a.Emails.Trim().Length == 0) return "Sem e-mail, nenhuma sessão é reconhecida como desta conta: ela fica sem tema e sem atividade no Clawd.";
+            if (a.Emails.Trim().Length == 0) return L.T("Sem e-mail, nenhuma sessão é reconhecida como desta conta: ela fica sem tema e sem atividade no Clawd.", "Without an email, no session is recognized as this account's: it gets no theme and no Clawd activity.");
             if (a.Emails.Split(',', ';', ' ').Contains("*") && c.Accounts.Any(x => x != a && x.Emails.Split(',', ';', ' ').Contains("*")))
-                return "Outra conta também tem *. Só a primeira da lista fica com os e-mails que sobram.";
+                return L.T("Outra conta também tem *. Só a primeira da lista fica com os e-mails que sobram.", "Another account also has *. Only the first one in the list gets the remaining emails.");
             return null;
         }
 
@@ -418,10 +418,10 @@ namespace Clawdesk
         UIElement BuildTheme(AccountCfg a)
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Check("Usar um tema próprio nesta conta", a.ThemeOn, delegate(bool v) { a.ThemeOn = v; Changed(true); }));
+            sp.Children.Add(Ui.Check(L.T("Usar um tema próprio nesta conta", "Use a custom theme for this account"), a.ThemeOn, delegate(bool v) { a.ThemeOn = v; Changed(true); }));
             if (!a.ThemeOn)
             {
-                sp.Children.Add(Ui.T("Esta conta fica com as cores normais do Claude.", 12.5, Ui.Dim, false));
+                sp.Children.Add(Ui.T(L.T("Esta conta fica com as cores normais do Claude.", "This account keeps Claude's normal colors."), 12.5, Ui.Dim, false));
                 return sp;
             }
 
@@ -430,12 +430,12 @@ namespace Clawdesk
             sp.Children.Add(presets);
 
             var colors = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
-            colors.Children.Add(ColorPick("Principal", "Botões, links e destaques.", a.Accent, delegate(string v) { a.Accent = v; Changed(true); }));
-            colors.Children.Add(ColorPick("Fundo", "O tom dos fundos e dos textos.", a.Surface, delegate(string v) { a.Surface = v; Changed(true); }));
-            colors.Children.Add(ColorPick("Sucesso", null, a.Success, delegate(string v) { a.Success = v; Changed(true); }));
-            colors.Children.Add(ColorPick("Aviso", null, a.Warning, delegate(string v) { a.Warning = v; Changed(true); }));
-            colors.Children.Add(ColorPick("Erro", null, a.Danger, delegate(string v) { a.Danger = v; Changed(true); }));
-            colors.Children.Add(ColorPick("Pro", "Selos e recursos extras.", a.Pro, delegate(string v) { a.Pro = v; Changed(true); }));
+            colors.Children.Add(ColorPick(L.T("Principal", "Accent"), L.T("Botões, links e destaques.", "Buttons, links and highlights."), a.Accent, delegate(string v) { a.Accent = v; Changed(true); }));
+            colors.Children.Add(ColorPick(L.T("Fundo", "Background"), L.T("O tom dos fundos e dos textos.", "The tint of backgrounds and text."), a.Surface, delegate(string v) { a.Surface = v; Changed(true); }));
+            colors.Children.Add(ColorPick(L.T("Sucesso", "Success"), null, a.Success, delegate(string v) { a.Success = v; Changed(true); }));
+            colors.Children.Add(ColorPick(L.T("Aviso", "Warning"), null, a.Warning, delegate(string v) { a.Warning = v; Changed(true); }));
+            colors.Children.Add(ColorPick(L.T("Erro", "Error"), null, a.Danger, delegate(string v) { a.Danger = v; Changed(true); }));
+            colors.Children.Add(ColorPick("Pro", L.T("Selos e recursos extras.", "Badges and extra features."), a.Pro, delegate(string v) { a.Pro = v; Changed(true); }));
             sp.Children.Add(colors);
 
             var previews = new WrapPanel();
@@ -443,7 +443,7 @@ namespace Clawdesk
             {
                 var one = new StackPanel { Margin = new Thickness(0, 0, 16, 0) };
                 one.Children.Add(new ThemePreview(a, dark));
-                var cap = Ui.T(dark ? "Escuro" : "Claro", 11.5, Ui.Dim, false);
+                var cap = Ui.T(dark ? L.T("Escuro", "Dark") : L.T("Claro", "Light"), 11.5, Ui.Dim, false);
                 cap.Margin = new Thickness(2, 5, 0, 0);
                 one.Children.Add(cap);
                 previews.Children.Add(one);
@@ -457,7 +457,7 @@ namespace Clawdesk
         UIElement BuildClawd(AccountCfg a)
         {
             var sp = new StackPanel();
-            sp.Children.Add(Ui.Check("Mostrar o Clawd desta conta", a.ShowClawd, delegate(bool v) { a.ShowClawd = v; Changed(true); }));
+            sp.Children.Add(Ui.Check(L.T("Mostrar o Clawd desta conta", "Show this account's Clawd"), a.ShowClawd, delegate(bool v) { a.ShowClawd = v; Changed(true); }));
             if (!a.ShowClawd) return sp;
 
             var top = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 14) };
@@ -471,21 +471,21 @@ namespace Clawdesk
             both.Children.Add(big);
             var pup = View(3, a, string.IsNullOrEmpty(a.PupSkin) ? a.Skin : a.PupSkin);
             pup.VerticalAlignment = VerticalAlignment.Bottom;
-            pup.ToolTip = "Um filhote aparece para cada sessão extra aberta na conta.";
+            pup.ToolTip = L.T("Um filhote aparece para cada sessão extra aberta na conta.", "A pup appears for each extra session open in the account.");
             both.Children.Add(pup);
             stage.Child = both;
             top.Children.Add(stage);
 
             var right = new StackPanel { Margin = new Thickness(18, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             var colors = new WrapPanel();
-            colors.Children.Add(ColorPick("Corpo", "Sombra, brilho e contorno saem desta cor.", a.Body, delegate(string v) { a.Body = v; Changed(true); }));
-            colors.Children.Add(ColorPick("Detalhe", "Acessórios da skin e enfeites.", a.Detail, delegate(string v) { a.Detail = v; Changed(true); }));
+            colors.Children.Add(ColorPick(L.T("Corpo", "Body"), L.T("Sombra, brilho e contorno saem desta cor.", "Shading, highlight and outline come from this color."), a.Body, delegate(string v) { a.Body = v; Changed(true); }));
+            colors.Children.Add(ColorPick(L.T("Detalhe", "Detail"), L.T("Acessórios da skin e enfeites.", "Skin accessories and decorations."), a.Detail, delegate(string v) { a.Detail = v; Changed(true); }));
             right.Children.Add(colors);
-            var same = Ui.Button("Usar a cor do tema", null, delegate { a.Body = a.Accent; a.Detail = a.Warning; Changed(true); });
+            var same = Ui.Button(L.T("Usar a cor do tema", "Use the theme color"), null, delegate { a.Body = a.Accent; a.Detail = a.Warning; Changed(true); });
             same.Margin = new Thickness(0, 4, 0, 10);
             right.Children.Add(same);
-            var hat = Ui.Check("Chapéu do modelo em uso", a.Hat, delegate(bool v) { a.Hat = v; Changed(false); });
-            hat.ToolTip = "Mago para o Fable, coroa para o Opus, fones para o Sonnet e broto para o Haiku.";
+            var hat = Ui.Check(L.T("Chapéu do modelo em uso", "Hat for the model in use"), a.Hat, delegate(bool v) { a.Hat = v; Changed(false); });
+            hat.ToolTip = L.T("Mago para o Fable, coroa para o Opus, fones para o Sonnet e broto para o Haiku.", "Wizard hat for Fable, crown for Opus, headphones for Sonnet and a sprout for Haiku.");
             right.Children.Add(hat);
             top.Children.Add(right);
             sp.Children.Add(top);
@@ -504,14 +504,14 @@ namespace Clawdesk
                 cell.Children.Add(cap);
                 var chip = Ui.Chip(cell, a.Skin == skin.Id, a.Body, delegate { a.Skin = skin.Id; Changed(true); });
                 chip.Padding = new Thickness(5, 4, 5, 5);
-                if (skin.Custom) chip.ToolTip = "Skin da pasta de skins (" + skin.Id + ".json)";
+                if (skin.Custom) chip.ToolTip = L.T("Skin da pasta de skins (", "Skin from the skins folder (") + skin.Id + ".json)";
                 grid.Children.Add(chip);
             }
             sp.Children.Add(grid);
 
-            sp.Children.Add(Ui.T("Skin dos filhotes", 13.5, Ui.Text, true));
+            sp.Children.Add(Ui.T(L.T("Skin dos filhotes", "Pups' skin"), 13.5, Ui.Text, true));
             var pups = new WrapPanel { Margin = new Thickness(0, 8, 0, 6) };
-            pups.Children.Add(Ui.Chip(Ui.T("Igual à do grande", 12.5, Ui.Text, false), string.IsNullOrEmpty(a.PupSkin), a.Body, delegate { a.PupSkin = ""; Changed(true); }));
+            pups.Children.Add(Ui.Chip(Ui.T(L.T("Igual à do grande", "Same as the big one"), 12.5, Ui.Text, false), string.IsNullOrEmpty(a.PupSkin), a.Body, delegate { a.PupSkin = ""; Changed(true); }));
             foreach (var sk in skins)
             {
                 var skin = sk;
@@ -520,10 +520,10 @@ namespace Clawdesk
             sp.Children.Add(pups);
 
             var more = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
-            more.Children.Add(Ui.Button(Ui.IcFolder, "Pasta de skins", null, delegate { Try(delegate { Process.Start("explorer.exe", "\"" + Cfg.SkinsDir + "\""); }); }));
-            more.Children.Add(Ui.Button(Ui.IcSync, "Recarregar", null, delegate { skins = Skin.LoadAll(Cfg.SkinsDir); Render(); }));
+            more.Children.Add(Ui.Button(Ui.IcFolder, L.T("Pasta de skins", "Skins folder"), null, delegate { Try(delegate { Process.Start("explorer.exe", "\"" + Cfg.SkinsDir + "\""); }); }));
+            more.Children.Add(Ui.Button(Ui.IcSync, L.T("Recarregar", "Reload"), null, delegate { skins = Skin.LoadAll(Cfg.SkinsDir); Render(); }));
             sp.Children.Add(more);
-            var hint = Ui.T("Cada .json na pasta de skins vira uma skin; o LEIA-ME de lá explica o formato.", 11.5, Ui.Dim, false);
+            var hint = Ui.T(L.T("Cada .json na pasta de skins vira uma skin; o LEIA-ME de lá explica o formato.", "Each .json in the skins folder becomes a skin; the README there explains the format."), 11.5, Ui.Dim, false);
             hint.Margin = new Thickness(0, 8, 0, 0);
             sp.Children.Add(hint);
             return sp;
@@ -540,8 +540,8 @@ namespace Clawdesk
         void AddAccount()
         {
             if (MessageBox.Show(Window.GetWindow(this),
-                    "Vou criar um perfil novo e abrir o Claude nele para você entrar com a outra conta.\n\nEle aparece aqui em seguida, com o nome \"Account N\"; para trocar o nome, use o Switcher.",
-                    "Nova conta", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
+                    L.T("Vou criar um perfil novo e abrir o Claude nele para você entrar com a outra conta.\n\nEle aparece aqui em seguida, com o nome \"Account N\"; para trocar o nome, use o Switcher.", "I'll create a new profile and open Claude in it so you can sign in with the other account.\n\nIt shows up here right after, named \"Account N\"; to rename it, use the Switcher."),
+                    L.T("Nova conta", "New account"), MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
             Try(Profiles.AddAccount);
         }
 
@@ -550,8 +550,8 @@ namespace Clawdesk
             int pid;
             if (!running.TryGetValue(a.Profile, out pid)) return;
             int n = ActiveOf(a);
-            string extra = n == 0 ? "" : "\n\n" + (n == 1 ? "Há 1 sessão ativa nele, que será interrompida." : "Há " + n + " sessões ativas nele, que serão interrompidas.");
-            if (MessageBox.Show(Window.GetWindow(this), "Fechar o Claude " + a.Name + "?" + extra, "Fechar", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            string extra = n == 0 ? "" : "\n\n" + (n == 1 ? L.T("Há 1 sessão ativa nele, que será interrompida.", "It has 1 active session, which will be interrupted.") : L.T("Há ", "It has ") + n + L.T(" sessões ativas nele, que serão interrompidas.", " active sessions, which will be interrupted."));
+            if (MessageBox.Show(Window.GetWindow(this), L.T("Fechar o Claude ", "Close Claude ") + a.Name + "?" + extra, L.T("Fechar", "Close"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
             Try(delegate
             {
                 var psi = new ProcessStartInfo("taskkill.exe", "/PID " + pid + " /T /F");

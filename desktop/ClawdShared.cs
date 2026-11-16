@@ -4,6 +4,7 @@
 
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -13,6 +14,50 @@ using System.Threading;
 
 namespace Clawdesk
 {
+    // O idioma da interface: português ou inglês. "auto" segue o idioma do Windows (português
+    // se ele estiver em português, inglês em qualquer outro caso). Vale para o processo todo:
+    // trocar nas Configurações reinicia o app.
+    static class L
+    {
+        static string choice = "auto";
+        static bool? en;
+
+        public static string Choice
+        {
+            get { return choice; }
+            set { choice = value == "pt" || value == "en" ? value : "auto"; en = null; }
+        }
+
+        public static bool En
+        {
+            get
+            {
+                if (!en.HasValue) en = choice == "en" || (choice == "auto" && CultureInfo.CurrentUICulture.TwoLetterISOLanguageName != "pt");
+                return en.Value;
+            }
+        }
+
+        // O código que o mod lê para falar a mesma língua: "pt" ou "en".
+        public static string Code { get { return En ? "en" : "pt"; } }
+
+        public static string T(string pt, string en) { return En ? en : pt; }
+
+        public static CultureInfo Culture { get { return CultureInfo.GetCultureInfo(En ? "en-US" : "pt-BR"); } }
+
+        // Lê só a escolha do config.json, sem carregar o resto (o instalador também usa).
+        public static void LoadChoice()
+        {
+            try
+            {
+                string path = Path.Combine(AppPaths.DataDir, "config.json");
+                if (!File.Exists(path)) return;
+                var m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(path), "\"idioma\"\\s*:\\s*\"(auto|pt|en)\"");
+                if (m.Success) Choice = m.Groups[1].Value;
+            }
+            catch { }
+        }
+    }
+
     static class AppPaths
     {
         public const string Name = "Clawdesk";
@@ -71,7 +116,7 @@ namespace Clawdesk
                 string old = Path.Combine(Menu, "Startup", name);
                 if (File.Exists(old)) File.Delete(old);
             }
-            if (on) Shortcut(StartupLnk, exe, "--fundo", "Os Clawds e os avisos das sessões do Claude");
+            if (on) Shortcut(StartupLnk, exe, "--fundo", L.T("Os Clawds e os avisos das sessões do Claude", "Clawds and notifications for your Claude sessions"));
             else if (File.Exists(StartupLnk)) File.Delete(StartupLnk);
         }
     }
@@ -150,7 +195,7 @@ namespace Clawdesk
                 if (!p.WaitForExit(timeoutMs))
                 {
                     try { p.Kill(); } catch { }
-                    lock (sb) output = sb.ToString() + "\n(o claude demorou demais e foi parado)";
+                    lock (sb) output = sb.ToString() + L.T("\n(o claude demorou demais e foi parado)", "\n(claude took too long and was stopped)");
                     return -1;
                 }
                 p.WaitForExit();
@@ -182,7 +227,7 @@ namespace Clawdesk
         // Devolve null se deu certo, ou o erro.
         public static string InstallOrUpdate(ModStatus st)
         {
-            if (st == null || st.Claude == null) return "claude";
+            if (st == null || st.Claude == null) return L.T("Não achei o Claude Code (o comando claude) neste computador.", "Claude Code (the claude command) was not found on this computer.");
             string text;
             int code;
             if (st.Installed)
@@ -204,7 +249,7 @@ namespace Clawdesk
         static string Last(string text)
         {
             var lines = (text ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
-            return lines.Count == 0 ? "o claude terminou com erro, sem mensagem" : string.Join(" ", lines.Skip(Math.Max(0, lines.Count - 3)).ToArray());
+            return lines.Count == 0 ? L.T("o claude terminou com erro, sem mensagem", "claude exited with an error and no message") : string.Join(" ", lines.Skip(Math.Max(0, lines.Count - 3)).ToArray());
         }
     }
 }
