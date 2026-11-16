@@ -1,4 +1,4 @@
-// O visual do app: cores, textos e os controles feitos à mão (botões, interruptores,
+﻿// O visual do app: cores, textos e os controles feitos à mão (botões, interruptores,
 // cartões, abas, barras), todos no mesmo estilo escuro. C# 5, sem XAML.
 
 using System;
@@ -307,6 +307,24 @@ namespace ClawdDesktop
             if (m.Contains("sonnet")) return "Sonnet";
             if (m.Contains("haiku")) return "Haiku";
             return "";
+        }
+
+        // Barra de rolagem fina e escura, no lugar da clara do Windows.
+        public static Style ScrollBarStyle()
+        {
+            const string xaml =
+                "<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ScrollBar'>" +
+                "<Setter Property='Width' Value='10'/><Setter Property='MinWidth' Value='10'/><Setter Property='Background' Value='Transparent'/>" +
+                "<Setter Property='Template'><Setter.Value><ControlTemplate TargetType='ScrollBar'>" +
+                "<Grid Background='{TemplateBinding Background}'><Track x:Name='PART_Track' IsDirectionReversed='True'>" +
+                "<Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType='Thumb'>" +
+                "<Border x:Name='b' CornerRadius='3' Margin='2,2,2,2' Background='#3a3646'/>" +
+                "<ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='b' Property='Background' Value='#56506a'/></Trigger></ControlTemplate.Triggers>" +
+                "</ControlTemplate></Thumb.Template></Thumb></Track.Thumb></Track></Grid>" +
+                "</ControlTemplate></Setter.Value></Setter>" +
+                "<Style.Triggers><Trigger Property='Orientation' Value='Horizontal'><Setter Property='Visibility' Value='Collapsed'/></Trigger></Style.Triggers>" +
+                "</Style>";
+            return (Style)System.Windows.Markup.XamlReader.Parse(xaml);
         }
 
         // ---- seletor de cores

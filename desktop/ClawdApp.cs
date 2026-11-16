@@ -326,7 +326,8 @@ namespace ClawdDesktop
             accounts = new AccountsPage(delegate { return app.Cfg; }, app.Changed, photo);
             settings = new SettingsPage(app);
 
-            var root = new Grid();
+            Resources.Add(typeof(System.Windows.Controls.Primitives.ScrollBar), Ui.ScrollBarStyle());
+            var root = new Grid { Background = Ui.Bg };
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(232) });
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 

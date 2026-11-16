@@ -3465,6 +3465,9 @@ namespace ClawdDesktop
         public void PhotoSessions(params SessionView[] sessions)
         {
             if (fakeT < 0) fakeT = 0;
+            if (scene != null) EndScene(fakeT, true);
+            festa = false;
+            nextEvent = fakeT + 999;
             Scene(sessions);
         }
 
