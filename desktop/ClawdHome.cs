@@ -31,7 +31,7 @@ namespace ClawdDesktop
             Children.Add(frame);
 
             // o resumo, numa pílula no canto de cima
-            var pill = new Border { Background = Pal.B("#15131a", 0.88), CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 5, 14, 6), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 16, 14), IsHitTestVisible = false };
+            var pill = new Border { Background = Pal.B("#15131a", 0.88), CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 5, 14, 6), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(14, 0, 0, 14), IsHitTestVisible = false };
             summary.TextWrapping = TextWrapping.NoWrap;
             pill.Child = summary;
             Children.Add(pill);
