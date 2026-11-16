@@ -1,15 +1,18 @@
-// Instalador do Clawd Companheiro: um .exe só, com os dois programas embutidos.
+// Instalador do Clawd Companheiro: um .exe só, com o programa dentro.
 //
-// Copia ClawdDesktop.exe e ClawdCentral.exe para ~/.claude/clawd/app, cria os atalhos no
-// menu Iniciar (e na inicialização do Windows, se a pessoa quiser), registra o programa em
-// "Aplicativos instalados" e abre a Central. Rodar de novo atualiza; /uninstall remove.
-// As escolhas da pessoa (config.json, skins) nunca são apagadas.
+// Um assistente em quatro passos (boas-vindas, opções, instalação e pronto). Copia o
+// Clawd.exe para ~/.claude/clawd/app, tira os programas de antes da 1.2, cria os atalhos,
+// registra em "Aplicativos instalados" e, se a pessoa quiser, instala ou atualiza o mod do
+// Claude Code. Rodar de novo atualiza. As escolhas da pessoa (config.json, skins, histórico)
+// só são apagadas se ela pedir, na desinstalação.
 //
-//   ClawdSetup.exe               janela do instalador
-//   ClawdSetup.exe /quiet        instala sem perguntar
-//   ClawdSetup.exe /uninstall    remove (com /quiet, sem perguntar)
+//   ClawdSetup.exe                  o assistente
+//   ClawdSetup.exe /quiet           instala sem perguntar (é o que a atualização automática usa)
+//   ClawdSetup.exe /quiet /abrir    idem, e abre a janela no fim
+//   ClawdSetup.exe /uninstall       remove (com /quiet, sem perguntar)
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -19,107 +22,171 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using Microsoft.Win32;
-
-[assembly: AssemblyTitle("Instalador do Clawd Companheiro")]
-[assembly: AssemblyProduct("Clawd Companheiro")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+using ClawdDesktop;
 
 namespace ClawdSetup
 {
+    sealed class Options
+    {
+        public bool Startup = true, DesktopIcon, Mod = true, Open = true, Background;
+    }
+
     static class Installer
     {
-        public const string Name = "Clawd Companheiro";
-        public const string ModLine = "/plugin install clawd-companheiro --marketplace alexzjss/clawd-companheiro";
         const string RegKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\ClawdCompanheiro";
-        static readonly string[] Programs = { "ClawdDesktop.exe", "ClawdCentral.exe" };
-
-        public static string AppDir { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "clawd", "app"); } }
-        static string Menu { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft", "Windows", "Start Menu", "Programs"); } }
         static string Self { get { return Assembly.GetExecutingAssembly().Location; } }
-        public static string Version { get { return Assembly.GetExecutingAssembly().GetName().Version.ToString(3); } }
-        public static bool IsInstalled { get { return File.Exists(Path.Combine(AppDir, "ClawdCentral.exe")); } }
-        public static bool StartsWithWindows { get { return File.Exists(Path.Combine(Menu, "Startup", "Clawd.lnk")); } }
+        public static string Exe { get { return System.IO.Path.Combine(AppPaths.AppDir, AppPaths.Exe); } }
+        public static string Kept { get { return System.IO.Path.Combine(AppPaths.AppDir, "ClawdSetup.exe"); } }
 
-        static void StopPrograms()
-        {
-            foreach (string exe in Programs)
-                foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(exe)))
-                {
-                    try { p.Kill(); p.WaitForExit(3000); } catch { }
-                }
-        }
+        public static bool IsInstalled { get { return File.Exists(Exe) || AppPaths.OldExes.Any(e => File.Exists(System.IO.Path.Combine(AppPaths.AppDir, e))); } }
 
-        static void Shortcut(string lnk, string exe, string text)
+        public static string InstalledVersion
         {
-            dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell"));
-            dynamic s = shell.CreateShortcut(lnk);
-            s.TargetPath = Path.Combine(AppDir, exe);
-            s.WorkingDirectory = AppDir;
-            s.Description = text;
-            s.Save();
-        }
-
-        public static void Install(bool startup, bool open)
-        {
-            StopPrograms();
-            Directory.CreateDirectory(AppDir);
-            var asm = Assembly.GetExecutingAssembly();
-            foreach (string exe in Programs)
+            get
             {
-                using (Stream src = asm.GetManifestResourceStream(exe))
+                try { using (var k = Registry.CurrentUser.OpenSubKey(RegKey)) return k != null ? k.GetValue("DisplayVersion") as string : null; }
+                catch { return null; }
+            }
+        }
+
+        // O Claude Desktop, da loja ou do instalador comum.
+        public static bool HasClaudeDesktop
+        {
+            get
+            {
+                string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                return Directory.Exists(System.IO.Path.Combine(local, "AnthropicClaude")) || Directory.Exists(System.IO.Path.Combine(roaming, "Claude"))
+                    || Directory.Exists(System.IO.Path.Combine(local, "Packages")) && Directory.GetDirectories(System.IO.Path.Combine(local, "Packages"), "Claude_*").Length > 0;
+            }
+        }
+
+        public static void StopPrograms()
+        {
+            foreach (string name in new[] { "Clawd", "ClawdDesktop", "ClawdCentral" })
+                foreach (var p in Process.GetProcessesByName(name))
                 {
-                    if (src == null) throw new InvalidOperationException("Este instalador veio sem o " + exe + ".");
-                    using (var dst = File.Create(Path.Combine(AppDir, exe))) src.CopyTo(dst);
+                    try { p.Kill(); p.WaitForExit(4000); } catch { }
+                }
+            Thread.Sleep(300);
+        }
+
+        public static void CopyProgram()
+        {
+            Directory.CreateDirectory(AppPaths.AppDir);
+            using (Stream src = Assembly.GetExecutingAssembly().GetManifestResourceStream(AppPaths.Exe))
+            {
+                if (src == null) throw new InvalidOperationException("Este instalador veio sem o " + AppPaths.Exe + ".");
+                // o arquivo pode estar preso por um instante depois de fechar o programa
+                for (int i = 0; ; i++)
+                {
+                    try
+                    {
+                        using (var dst = File.Create(Exe)) src.CopyTo(dst);
+                        break;
+                    }
+                    catch (IOException) { if (i >= 8) throw; Thread.Sleep(500); src.Position = 0; }
                 }
             }
             // uma cópia do instalador fica junto, para o Windows conseguir desinstalar
-            string kept = Path.Combine(AppDir, "ClawdSetup.exe");
-            if (!string.Equals(Path.GetFullPath(Self), kept, StringComparison.OrdinalIgnoreCase)) File.Copy(Self, kept, true);
-
-            Shortcut(Path.Combine(Menu, "Clawd.lnk"), "ClawdDesktop.exe", "Os Clawds na área de trabalho");
-            Shortcut(Path.Combine(Menu, "Central dos Clawds.lnk"), "ClawdCentral.exe", "Contas do Claude, temas e Clawds");
-            string boot = Path.Combine(Menu, "Startup", "Clawd.lnk");
-            if (startup) Shortcut(boot, "ClawdDesktop.exe", "Os Clawds na área de trabalho");
-            else if (File.Exists(boot)) File.Delete(boot);
-
-            using (var k = Registry.CurrentUser.CreateSubKey(RegKey))
-            {
-                k.SetValue("DisplayName", Name);
-                k.SetValue("DisplayVersion", Version);
-                k.SetValue("Publisher", "alexzjss");
-                k.SetValue("DisplayIcon", Path.Combine(AppDir, "ClawdCentral.exe"));
-                k.SetValue("InstallLocation", AppDir);
-                k.SetValue("UninstallString", "\"" + kept + "\" /uninstall");
-                k.SetValue("QuietUninstallString", "\"" + kept + "\" /uninstall /quiet");
-                k.SetValue("URLInfoAbout", "https://github.com/alexzjss/clawd-companheiro");
-                k.SetValue("NoModify", 1, RegistryValueKind.DWord);
-                k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
-                k.SetValue("EstimatedSize", 1024, RegistryValueKind.DWord);
-            }
-
-            Process.Start(new ProcessStartInfo(Path.Combine(AppDir, "ClawdDesktop.exe")) { UseShellExecute = true });
-            if (open) Process.Start(new ProcessStartInfo(Path.Combine(AppDir, "ClawdCentral.exe")) { UseShellExecute = true });
+            if (!string.Equals(System.IO.Path.GetFullPath(Self), Kept, StringComparison.OrdinalIgnoreCase)) File.Copy(Self, Kept, true);
         }
 
-        public static void Uninstall()
+        public static void RemoveOld()
+        {
+            foreach (string exe in AppPaths.OldExes)
+            {
+                try { File.Delete(System.IO.Path.Combine(AppPaths.AppDir, exe)); } catch { }
+            }
+            foreach (string lnk in AppPaths.OldLnks)
+            {
+                try { File.Delete(System.IO.Path.Combine(AppPaths.Menu, lnk)); } catch { }
+            }
+        }
+
+        public static void Shortcuts(Options o)
+        {
+            AppPaths.Shortcut(AppPaths.MenuLnk, Exe, "", "Os Clawds e as sessões do Claude");
+            AppPaths.SetStartup(o.Startup, Exe);
+            if (o.DesktopIcon) AppPaths.Shortcut(AppPaths.DesktopLnk, Exe, "", "Os Clawds e as sessões do Claude");
+        }
+
+        public static void Register()
+        {
+            using (var k = Registry.CurrentUser.CreateSubKey(RegKey))
+            {
+                k.SetValue("DisplayName", AppPaths.Name);
+                k.SetValue("DisplayVersion", AppPaths.Version);
+                k.SetValue("Publisher", "alexzjss");
+                k.SetValue("DisplayIcon", Exe);
+                k.SetValue("InstallLocation", AppPaths.AppDir);
+                k.SetValue("UninstallString", "\"" + Kept + "\" /uninstall");
+                k.SetValue("QuietUninstallString", "\"" + Kept + "\" /uninstall /quiet");
+                k.SetValue("URLInfoAbout", "https://github.com/" + AppPaths.Repo);
+                k.SetValue("URLUpdateInfo", "https://github.com/" + AppPaths.Repo + "/releases");
+                k.SetValue("NoModify", 1, RegistryValueKind.DWord);
+                k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+                k.SetValue("EstimatedSize", 1200, RegistryValueKind.DWord);
+            }
+        }
+
+        public static void Launch(bool window)
+        {
+            Process.Start(new ProcessStartInfo(Exe, window ? "" : "--fundo") { UseShellExecute = true });
+        }
+
+        // Tudo de uma vez, sem janela.
+        public static void Quiet(bool open)
+        {
+            bool fresh = !IsInstalled;
+            var o = new Options { Startup = fresh || AppPaths.StartsWithWindows, DesktopIcon = File.Exists(AppPaths.DesktopLnk) };
+            StopPrograms();
+            CopyProgram();
+            RemoveOld();
+            Shortcuts(o);
+            Register();
+            // mod já instalado: atualiza junto, para os dois andarem na mesma versão
+            try
+            {
+                var st = ModTool.Status();
+                if (st.Installed) ModTool.InstallOrUpdate(st);
+            }
+            catch { }
+            Launch(open);
+        }
+
+        public static void Uninstall(bool wipeData)
         {
             StopPrograms();
-            foreach (string lnk in new[] { Path.Combine(Menu, "Clawd.lnk"), Path.Combine(Menu, "Central dos Clawds.lnk"), Path.Combine(Menu, "Startup", "Clawd.lnk") })
+            foreach (string lnk in new[] { AppPaths.MenuLnk, AppPaths.StartupLnk, AppPaths.DesktopLnk })
             {
                 try { File.Delete(lnk); } catch { }
             }
-            foreach (string exe in Programs)
-            {
-                try { File.Delete(Path.Combine(AppDir, exe)); } catch { }
-            }
+            RemoveOld();
+            try { File.Delete(Exe); } catch { }
             try { Registry.CurrentUser.DeleteSubKey(RegKey, false); } catch { }
-            // a cópia do instalador se apaga sozinha depois de fechar
-            string kept = Path.Combine(AppDir, "ClawdSetup.exe");
-            if (File.Exists(kept))
+            if (wipeData)
             {
-                var psi = new ProcessStartInfo("cmd.exe", "/c ping -n 3 127.0.0.1 >nul & del /q \"" + kept + "\"");
+                foreach (string f in new[] { "config.json", "historico.json", "app.log", "desktop.log", "central.log" })
+                {
+                    try { File.Delete(System.IO.Path.Combine(AppPaths.DataDir, f)); } catch { }
+                }
+                foreach (string d in new[] { "sessions", "skins" })
+                {
+                    try { Directory.Delete(System.IO.Path.Combine(AppPaths.DataDir, d), true); } catch { }
+                }
+                try
+                {
+                    foreach (string f in Directory.GetFiles(AppPaths.DataDir, "*.json")) File.Delete(f);
+                }
+                catch { }
+            }
+            // a cópia do instalador se apaga sozinha depois de fechar
+            if (File.Exists(Kept))
+            {
+                var psi = new ProcessStartInfo("cmd.exe", "/c ping -n 3 127.0.0.1 >nul & del /q \"" + Kept + "\" & rmdir \"" + AppPaths.AppDir + "\"");
                 psi.CreateNoWindow = true;
                 psi.UseShellExecute = false;
                 try { Process.Start(psi); } catch { }
@@ -127,101 +194,311 @@ namespace ClawdSetup
         }
     }
 
+    // ---------------------------------------------------------------- janela --
+
     sealed class SetupWindow : Window
     {
         static Brush B(string hex) { var b = (Brush)new BrushConverter().ConvertFromString(hex); b.Freeze(); return b; }
-        static readonly Brush Bg = B("#121016"), Soft = B("#2a2534"), Text = B("#f2f0f5"), Dim = B("#a9a3b6"), Good = B("#5ee08a");
+        static readonly Brush Bg = B("#0f0e13"), Card = B("#1b1922"), Soft = B("#2a2734"), SoftHi = B("#353142"), Line = B("#2e2a39");
+        static readonly Brush Text = B("#f3f1f7"), Dim = B("#a7a1b4"), Faint = B("#6f6a7c"), Good = B("#4ade80"), Warn = B("#f5a524"), Bad = B("#ef5350"), Accent = B("#d97757");
+        static readonly FontFamily Icons = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets");
 
-        readonly TextBlock status = new TextBlock();
-        readonly CheckBox startup = new CheckBox();
+        readonly Grid page = new Grid();
+        readonly StackPanel dots = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+        readonly StackPanel buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        readonly Options opt = new Options();
+        readonly bool installed;
+        readonly string oldVersion;
+        string claude;
+        bool working;
 
         static TextBlock T(string s, double size, Brush color, bool bold)
         {
-            return new TextBlock { Text = s, FontSize = size, Foreground = color, FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal, TextWrapping = TextWrapping.Wrap };
+            return new TextBlock { Text = s, FontSize = size, Foreground = color, FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+        }
+
+        static TextBlock Ic(string glyph, double size, Brush color)
+        {
+            return new TextBlock { Text = glyph, FontFamily = Icons, FontSize = size, Foreground = color, VerticalAlignment = VerticalAlignment.Center };
         }
 
         static Border Button(string text, bool primary, Action click)
         {
-            var b = new Border { CornerRadius = new CornerRadius(6), Padding = new Thickness(16, 8, 16, 9), Margin = new Thickness(0, 0, 8, 0), Background = primary ? Brushes.White : Soft, Cursor = Cursors.Hand };
-            b.Child = new TextBlock { Text = text, FontSize = 13, FontWeight = primary ? FontWeights.SemiBold : FontWeights.Normal, Foreground = primary ? Bg : Text };
-            b.MouseEnter += delegate { b.Opacity = 0.85; };
-            b.MouseLeave += delegate { b.Opacity = 1; };
+            Brush bg = primary ? Accent : Soft, hi = primary ? B("#e48a6b") : SoftHi;
+            var b = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(18, 8, 18, 9), Margin = new Thickness(8, 0, 0, 0), Background = bg, Cursor = Cursors.Hand };
+            b.Child = new TextBlock { Text = text, FontSize = 13, FontWeight = primary ? FontWeights.SemiBold : FontWeights.Normal, Foreground = primary ? Brushes.White : Text };
+            b.MouseEnter += delegate { b.Background = hi; };
+            b.MouseLeave += delegate { b.Background = bg; };
             b.MouseLeftButtonUp += delegate { click(); };
             return b;
         }
 
+        // Uma opção com interruptor, título e explicação.
+        static FrameworkElement Option(string title, string note, bool value, bool enabled, Action<bool> set)
+        {
+            bool v = value;
+            var knob = new Ellipse { Width = 14, Height = 14 };
+            var track = new Border { Width = 40, Height = 22, CornerRadius = new CornerRadius(11), Padding = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center, Child = knob, Cursor = enabled ? Cursors.Hand : Cursors.Arrow };
+            Action paint = delegate
+            {
+                track.Background = v ? Accent : SoftHi;
+                knob.HorizontalAlignment = v ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+                knob.Fill = v ? Brushes.White : Dim;
+            };
+            paint();
+            var g = new Grid { Margin = new Thickness(0, 0, 0, 14), Opacity = enabled ? 1 : 0.5 };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var left = new StackPanel { Margin = new Thickness(0, 0, 16, 0) };
+            left.Children.Add(T(title, 13.5, Text, false));
+            if (note != null) { var n = T(note, 12, Dim, false); n.Margin = new Thickness(0, 2, 0, 0); left.Children.Add(n); }
+            g.Children.Add(left);
+            Grid.SetColumn(track, 1);
+            g.Children.Add(track);
+            if (enabled)
+            {
+                g.Background = Brushes.Transparent;
+                g.Cursor = Cursors.Hand;
+                g.MouseLeftButtonUp += delegate { v = !v; paint(); set(v); };
+            }
+            return g;
+        }
+
         public SetupWindow()
         {
-            bool installed = Installer.IsInstalled;
-            Title = "Instalar o " + Installer.Name;
-            Width = 500;
-            SizeToContent = SizeToContent.Height;
+            installed = Installer.IsInstalled;
+            oldVersion = Installer.InstalledVersion;
+            Title = (installed ? "Atualizar o " : "Instalar o ") + AppPaths.Name;
+            Width = 560;
+            Height = 520;
             ResizeMode = ResizeMode.NoResize;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Background = Bg;
-            FontFamily = new FontFamily("Segoe UI");
+            FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
             UseLayoutRounding = true;
+            TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
 
-            var sp = new StackPanel { Margin = new Thickness(28, 24, 28, 24) };
-            sp.Children.Add(T(Installer.Name, 22, Text, true));
-            var ver = T("versão " + Installer.Version, 12, Dim, false);
-            ver.Margin = new Thickness(0, 2, 0, 14);
-            sp.Children.Add(ver);
-            sp.Children.Add(T("Põe um Clawd por conta do Claude em cima da barra de tarefas e instala a Central dos Clawds, onde você escolhe contas, temas, cores e skins.", 13, Text, false));
+            var root = new DockPanel();
+            var foot = new Grid { Margin = new Thickness(30, 0, 30, 24) };
+            foot.Children.Add(dots);
+            foot.Children.Add(buttons);
+            DockPanel.SetDock(foot, Dock.Bottom);
+            root.Children.Add(foot);
+            page.Margin = new Thickness(30, 28, 30, 16);
+            root.Children.Add(page);
+            Content = root;
+            Closing += delegate(object s, System.ComponentModel.CancelEventArgs e) { if (working) e.Cancel = true; };
 
-            startup.Content = T("Abrir os Clawds junto com o Windows", 13, Text, false);
-            startup.IsChecked = !installed || Installer.StartsWithWindows;
-            startup.Margin = new Thickness(0, 16, 0, 0);
-            startup.VerticalContentAlignment = VerticalAlignment.Center;
-            sp.Children.Add(startup);
-
-            var mod = T("Falta só o mod, que mostra o Clawd dentro do Claude e conta aos Clawds o que cada sessão faz. No Claude Code, rode:", 12.5, Dim, false);
-            mod.Margin = new Thickness(0, 18, 0, 6);
-            sp.Children.Add(mod);
-            var line = new Border { Background = Soft, CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 7, 10, 8), Cursor = Cursors.Hand, ToolTip = "Clique para copiar" };
-            line.Child = new TextBlock { Text = Installer.ModLine, FontFamily = new FontFamily("Consolas"), FontSize = 12, Foreground = Text, TextWrapping = TextWrapping.Wrap };
-            line.MouseLeftButtonUp += delegate
-            {
-                try { Clipboard.SetText(Installer.ModLine); Say("Comando copiado.", true); } catch { }
-            };
-            sp.Children.Add(line);
-
-            status.FontSize = 12.5;
-            status.TextWrapping = TextWrapping.Wrap;
-            status.Margin = new Thickness(0, 14, 0, 0);
-            status.Visibility = Visibility.Collapsed;
-            sp.Children.Add(status);
-
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 18, 0, 0) };
-            row.Children.Add(Button(installed ? "Atualizar" : "Instalar", true, DoInstall));
-            if (installed) row.Children.Add(Button("Remover", false, DoUninstall));
-            row.Children.Add(Button("Fechar", false, Close));
-            sp.Children.Add(row);
-            Content = sp;
+            claude = ModTool.FindClaude();
+            opt.Startup = !installed || AppPaths.StartsWithWindows;
+            opt.DesktopIcon = File.Exists(AppPaths.DesktopLnk);
+            opt.Mod = claude != null;
+            Welcome();
         }
 
-        void Say(string text, bool ok)
+        void Step(int i)
         {
-            status.Text = text;
-            status.Foreground = ok ? Good : B("#f5a524");
-            status.Visibility = Visibility.Visible;
+            dots.Children.Clear();
+            for (int k = 0; k < 4; k++)
+                dots.Children.Add(new Border { Width = k == i ? 20 : 7, Height = 7, CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, 6, 0), Background = k == i ? Accent : SoftHi });
+            page.Children.Clear();
+            buttons.Children.Clear();
         }
 
-        void DoInstall()
+        static FrameworkElement Check(string glyph, Brush color, string text)
         {
-            try
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+            var ic = Ic(glyph, 13, color);
+            ic.Margin = new Thickness(0, 1, 10, 0);
+            row.Children.Add(ic);
+            row.Children.Add(T(text, 12.5, Dim, false));
+            return row;
+        }
+
+        void Welcome()
+        {
+            Step(0);
+            var sp = new StackPanel();
+            sp.Children.Add(T(AppPaths.Name, 26, Text, true));
+            string ver = installed && oldVersion != null && oldVersion != AppPaths.Version ? "atualizar da versão " + oldVersion + " para a " + AppPaths.Version
+                : installed ? "versão " + AppPaths.Version + " (reinstalar)" : "versão " + AppPaths.Version;
+            var v = T(ver, 13, Faint, false);
+            v.Margin = new Thickness(0, 2, 0, 18);
+            sp.Children.Add(v);
+            sp.Children.Add(T("Um mascote em pixel art para cada conta do Claude, em cima da barra de tarefas, e uma janela com todas as sessões, estatísticas, temas e avisos quando uma sessão termina ou espera você.", 13.5, Text, false));
+            var checks = new StackPanel { Margin = new Thickness(0, 22, 0, 0) };
+            checks.Children.Add(Check("\uE73E", Good, "Windows " + Environment.OSVersion.Version.Major + " com .NET Framework " + Environment.Version.ToString(2)));
+            checks.Children.Add(Installer.HasClaudeDesktop ? Check("\uE73E", Good, "Claude Desktop encontrado") : Check("\uE7BA", Warn, "Não achei o Claude Desktop. Instale-o depois, em claude.ai/download"));
+            checks.Children.Add(claude != null ? Check("\uE73E", Good, "Claude Code encontrado: dá para instalar o mod junto") : Check("\uE946", Faint, "Claude Code não encontrado: o mod pode ser instalado depois, pelo app"));
+            if (installed) checks.Children.Add(Check("\uE946", Faint, "Suas contas, cores, skins e histórico continuam como estão."));
+            sp.Children.Add(checks);
+            page.Children.Add(sp);
+            if (installed) buttons.Children.Add(Button("Remover…", false, Uninstall));
+            buttons.Children.Add(Button("Cancelar", false, Close));
+            buttons.Children.Add(Button("Continuar", true, Choose));
+        }
+
+        void Choose()
+        {
+            Step(1);
+            var sp = new StackPanel();
+            sp.Children.Add(T("Opções", 22, Text, true));
+            var sub = T("Dá para mudar tudo isso depois, nas Configurações do app.", 12.5, Dim, false);
+            sub.Margin = new Thickness(0, 4, 0, 22);
+            sp.Children.Add(sub);
+            sp.Children.Add(Option("Abrir com o Windows", "Começa na bandeja, sem janela, de olho nas sessões.", opt.Startup, true, delegate(bool x) { opt.Startup = x; }));
+            sp.Children.Add(Option("Atalho na área de trabalho", null, opt.DesktopIcon, true, delegate(bool x) { opt.DesktopIcon = x; }));
+            sp.Children.Add(Option(claude != null ? "Instalar ou atualizar o mod do Claude Code" : "Instalar o mod do Claude Code",
+                claude != null ? "É ele que conta ao app o que cada sessão faz." : "Precisa do Claude Code instalado. Dá para fazer depois, pelo app.", opt.Mod, claude != null, delegate(bool x) { opt.Mod = x; }));
+            sp.Children.Add(Option("Abrir o Clawd Companheiro no fim", null, opt.Open, true, delegate(bool x) { opt.Open = x; }));
+            page.Children.Add(sp);
+            buttons.Children.Add(Button("Voltar", false, Welcome));
+            buttons.Children.Add(Button(installed ? "Atualizar" : "Instalar", true, Install));
+        }
+
+        // ---- instalação
+
+        sealed class Row
+        {
+            public TextBlock Icon, Text;
+        }
+
+        Row AddRow(StackPanel list, string text)
+        {
+            var g = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
+            var r = new Row { Icon = Ic("\u25CB", 13, Faint), Text = T(text, 13.5, Dim, false) };
+            r.Icon.Width = 22;
+            g.Children.Add(r.Icon);
+            g.Children.Add(r.Text);
+            list.Children.Add(g);
+            return r;
+        }
+
+        void Mark(Row r, int state, string extra)
+        {
+            Dispatcher.Invoke(new Action(delegate
             {
-                Installer.Install(startup.IsChecked == true, true);
-                Say("Instalado. Os Clawds já estão na barra de tarefas e a Central abriu; pode fechar esta janela.", true);
+                r.Icon.Text = state == 0 ? "\u25CF" : state == 1 ? "\uE73E" : state == 2 ? "\uE7BA" : "\uE711";
+                r.Icon.Foreground = state == 0 ? Accent : state == 1 ? Good : state == 2 ? Warn : Bad;
+                r.Text.Foreground = state == 0 ? Text : Dim;
+                if (extra != null) r.Text.Text += " — " + extra;
+            }));
+        }
+
+        void Install()
+        {
+            Step(2);
+            var sp = new StackPanel();
+            sp.Children.Add(T(installed ? "Atualizando…" : "Instalando…", 22, Text, true));
+            var list = new StackPanel { Margin = new Thickness(0, 22, 0, 0) };
+            sp.Children.Add(list);
+            page.Children.Add(sp);
+            var steps = new List<Tuple<Row, Action>>();
+            steps.Add(Tuple.Create(AddRow(list, "Fechar o Clawd que estiver aberto"), (Action)Installer.StopPrograms));
+            steps.Add(Tuple.Create(AddRow(list, "Copiar o programa"), (Action)Installer.CopyProgram));
+            steps.Add(Tuple.Create(AddRow(list, "Tirar os programas antigos"), (Action)Installer.RemoveOld));
+            steps.Add(Tuple.Create(AddRow(list, "Criar os atalhos"), (Action)delegate { Installer.Shortcuts(opt); }));
+            steps.Add(Tuple.Create(AddRow(list, "Registrar em Aplicativos instalados"), (Action)Installer.Register));
+            Row mod = opt.Mod && claude != null ? AddRow(list, "Instalar o mod do Claude Code") : null;
+            working = true;
+            var o = opt;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string fail = null, modFail = null;
+                foreach (var s in steps)
+                {
+                    Mark(s.Item1, 0, null);
+                    try { s.Item2(); Mark(s.Item1, 1, null); }
+                    catch (Exception e) { fail = e.Message; Mark(s.Item1, 3, e.Message); break; }
+                }
+                if (fail == null && mod != null)
+                {
+                    Mark(mod, 0, null);
+                    try
+                    {
+                        modFail = ModTool.InstallOrUpdate(ModTool.Status());
+                        Mark(mod, modFail == null ? 1 : 2, modFail == null ? null : "não deu");
+                    }
+                    catch (Exception e) { modFail = e.Message; Mark(mod, 2, "não deu"); }
+                }
+                if (fail == null && o.Open) { try { Installer.Launch(true); } catch { } }
+                else if (fail == null) { try { Installer.Launch(false); } catch { } }
+                Dispatcher.BeginInvoke(new Action(delegate { working = false; Finish(fail, modFail, mod != null); }));
+            });
+        }
+
+        void Finish(string fail, string modFail, bool triedMod)
+        {
+            Step(3);
+            var sp = new StackPanel();
+            if (fail != null)
+            {
+                sp.Children.Add(T("Não consegui terminar", 22, Text, true));
+                var e = T(fail, 13, Bad, false);
+                e.Margin = new Thickness(0, 10, 0, 0);
+                sp.Children.Add(e);
+                var n = T("Feche o Clawd Companheiro se ele estiver aberto e tente de novo. Se continuar, abra uma issue no GitHub do projeto com essa mensagem.", 12.5, Dim, false);
+                n.Margin = new Thickness(0, 10, 0, 0);
+                sp.Children.Add(n);
+                page.Children.Add(sp);
+                buttons.Children.Add(Button("Fechar", false, Close));
+                buttons.Children.Add(Button("Tentar de novo", true, Install));
+                return;
             }
-            catch (Exception e) { Say("Não consegui instalar: " + e.Message, false); }
+            sp.Children.Add(T(installed ? "Atualizado!" : "Instalado!", 26, Text, true));
+            var msg = T(opt.Open ? "O Clawd Companheiro já abriu. Ele fica na bandeja do Windows, perto do relógio; feche a janela à vontade." : "O Clawd Companheiro está rodando na bandeja do Windows, perto do relógio.", 13.5, Text, false);
+            msg.Margin = new Thickness(0, 10, 0, 0);
+            sp.Children.Add(msg);
+            if (triedMod && modFail == null)
+            {
+                var m = T("O mod foi instalado. Reinicie o Claude para ele carregar.", 13, Good, false);
+                m.Margin = new Thickness(0, 14, 0, 0);
+                sp.Children.Add(m);
+            }
+            else
+            {
+                var m = T((triedMod ? "Não consegui instalar o mod (" + modFail + "). " : "Falta o mod. ") + "Pelo app, em Configurações, ou dentro do Claude Code com o comando abaixo (clique para copiar):", 12.5, triedMod ? Warn : Dim, false);
+                m.Margin = new Thickness(0, 16, 0, 6);
+                sp.Children.Add(m);
+                var line = new Border { Background = Soft, CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 8, 12, 9), Cursor = Cursors.Hand, ToolTip = "Clique para copiar" };
+                var lt = new TextBlock { Text = ModTool.ManualLine, FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 12, Foreground = Text, TextWrapping = TextWrapping.Wrap };
+                line.Child = lt;
+                line.MouseLeftButtonUp += delegate { try { Clipboard.SetText(ModTool.ManualLine); lt.Text = "Copiado!"; } catch { } };
+                sp.Children.Add(line);
+            }
+            var tip = T("O Windows pode avisar que o instalador não é assinado. Para atualizar das próximas vezes, o próprio app avisa e faz tudo sozinho.", 12, Faint, false);
+            tip.Margin = new Thickness(0, 18, 0, 0);
+            sp.Children.Add(tip);
+            page.Children.Add(sp);
+            if (!opt.Open) buttons.Children.Add(Button("Abrir agora", false, delegate { try { Installer.Launch(true); } catch { } Close(); }));
+            buttons.Children.Add(Button("Concluir", true, Close));
         }
 
-        void DoUninstall()
+        // ---- remover
+
+        void Uninstall()
         {
-            if (MessageBox.Show(this, "Remover o " + Installer.Name + "?\n\nSuas cores, contas e skins ficam guardadas em .claude\\clawd.", Title, MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-            Installer.Uninstall();
-            Say("Removido.", true);
+            Step(1);
+            bool wipe = false;
+            var sp = new StackPanel();
+            sp.Children.Add(T("Remover o " + AppPaths.Name, 22, Text, true));
+            var n = T("Tira o programa, os atalhos e o registro em Aplicativos instalados. O mod do Claude Code fica; para tirar, use /plugin no Claude Code.", 13, Dim, false);
+            n.Margin = new Thickness(0, 6, 0, 22);
+            sp.Children.Add(n);
+            sp.Children.Add(Option("Apagar também as minhas escolhas", "Contas, cores, skins próprias e o histórico das estatísticas, em .claude\\clawd.", false, true, delegate(bool x) { wipe = x; }));
+            page.Children.Add(sp);
+            buttons.Children.Add(Button("Voltar", false, Welcome));
+            buttons.Children.Add(Button("Remover", true, delegate
+            {
+                try
+                {
+                    Installer.Uninstall(wipe);
+                    Step(3);
+                    page.Children.Add(T("Removido. Até a próxima!", 22, Text, true));
+                    buttons.Children.Add(Button("Fechar", true, Close));
+                }
+                catch (Exception e) { MessageBox.Show(this, e.Message, AppPaths.Name, MessageBoxButton.OK, MessageBoxImage.Warning); }
+            }));
         }
     }
 
@@ -240,14 +517,14 @@ namespace ClawdSetup
                 {
                     if (has("uninstall"))
                     {
-                        if (!quiet && MessageBox.Show("Remover o " + Installer.Name + "?\n\nSuas cores, contas e skins ficam guardadas em .claude\\clawd.", Installer.Name, MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return 1;
-                        Installer.Uninstall();
-                        if (!quiet) MessageBox.Show("Removido.", Installer.Name);
+                        if (!quiet && MessageBox.Show("Remover o " + AppPaths.Name + "?\n\nSuas cores, contas, skins e histórico ficam guardados em .claude\\clawd.", AppPaths.Name, MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return 1;
+                        Installer.Uninstall(false);
+                        if (!quiet) MessageBox.Show("Removido.", AppPaths.Name);
                         return 0;
                     }
                     if (quiet)
                     {
-                        Installer.Install(!Installer.IsInstalled || Installer.StartsWithWindows, false);
+                        Installer.Quiet(has("abrir"));
                         return 0;
                     }
                     new Application().Run(new SetupWindow());
@@ -255,7 +532,7 @@ namespace ClawdSetup
                 }
                 catch (Exception e)
                 {
-                    if (!quiet) MessageBox.Show(e.Message, Installer.Name, MessageBoxButton.OK, MessageBoxImage.Error);
+                    if (!quiet) MessageBox.Show(e.Message, AppPaths.Name, MessageBoxButton.OK, MessageBoxImage.Error);
                     return 2;
                 }
             }

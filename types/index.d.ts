@@ -51,6 +51,13 @@ export type SessionInfo = {
   agents?: number
   /** O modelo do último passo do turno. */
   model?: string
+  /** Chamadas de ferramenta na sessão, por "Ferramenta" ou "Ferramenta:categoria" (nunca o comando ou o caminho). */
+  tools?: Record<string, number>
+  /** Tempo somado dos turnos já terminados, em ms. */
+  busyMs?: number
+  /** Turnos que terminaram com resposta e com erro. */
+  done?: number
+  failed?: number
 }
 
 declare module 'claude-code' {

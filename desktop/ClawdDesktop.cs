@@ -1,18 +1,19 @@
-﻿// Os Clawds da área de trabalho do Windows, em pixel art: um por conta do Claude, nas
-// cores de cada uma, numa faixa limitada no canto direito, bem acima da barra de tarefas.
+﻿// Os Clawds em pixel art: um por conta do Claude, nas cores de cada uma. Fora da Home,
+// moram numa faixa no canto da tela, bem acima da barra de tarefas; com a Home do app
+// aberta, mudam-se para lá (AttachHome) e voltam quando ela fecha (DetachHome).
 //
 // Lê o que as sessões do mod clawd-companheiro gravam em ~/.claude/clawd:
 //   sessions/<id>.json     estado de cada sessão: ferramenta, tipo de comando/arquivo,
 //                          subagentes, modelo, contexto, custo
 //   memoria-<conta>.json   memória da conta (humor)
 //   uso-<conta>.json       limites de uso da conta
+// e avisa o app a cada leitura (SessionsRead), para a Home, os avisos e o histórico.
 //
 // O Clawd grande é a sessão mais antiga aberta na conta; cada outra sessão ativa vira um
 // filhote. Passar o mouse: painel curto com sessões, limites e custo. Clique: carinho.
 // Duplo clique: abre o Claude da conta. Arrastar: ele balança e cai. Botão direito: menu.
 //
 // Tudo é desenhado numa grade de pixels e ampliado por um fator inteiro, sem suavização.
-// Compilar: build.ps1 (csc do .NET Framework 4, C# 5). --demo passa por todos os casos.
 
 using System;
 using System.Collections.Generic;
@@ -97,6 +98,8 @@ namespace ClawdDesktop
         public string Id, Account, Label, State, Tool, Detail, Model;
         public double StartedAt, UpdatedAt, EndedAt, TurnStartedAt, Turns, Agents;
         public double Cost = double.NaN, Ctx = double.NaN;
+        public double BusyMs = double.NaN, Done = double.NaN, Failed = double.NaN;
+        public Dictionary<string, double> Tools;   // "Bash:git" -> chamadas (mods antigos não mandam)
 
         public bool IsActive(double nowMs) { return EndedAt <= 0 && nowMs - UpdatedAt < 180000; }
 
@@ -120,6 +123,16 @@ namespace ClawdDesktop
             s.Agents = Data.Num(d, "agents", 0);
             s.Cost = Data.Num(d, "costUsd", double.NaN);
             s.Ctx = Data.Num(d, "contextPercent", double.NaN);
+            s.BusyMs = Data.Num(d, "busyMs", double.NaN);
+            s.Done = Data.Num(d, "done", double.NaN);
+            s.Failed = Data.Num(d, "failed", double.NaN);
+            object tools;
+            var td = d.TryGetValue("tools", out tools) ? tools as Dictionary<string, object> : null;
+            if (td != null)
+            {
+                s.Tools = new Dictionary<string, double>();
+                foreach (var kv in td.Take(200)) s.Tools[kv.Key] = Data.Num(td, kv.Key, 0);
+            }
             return s;
         }
     }
@@ -409,6 +422,7 @@ namespace ClawdDesktop
         public double Swing, LastWave = -100, NextEmit;
         public Rect Bounds;
         public double TopY;
+        public double FreeUntil;  // chamado para um ponto (na Home): pode sair da faixa dele
         public Scene Scene;     // o evento em que ele está, se houver
         public bool NoShadow;   // montado em outro: sem sombra no chão
         public readonly Pix Grid = new Pix();
@@ -510,6 +524,23 @@ namespace ClawdDesktop
         int petCount;
         double lastPet;
 
+        // A Home do app: enquanto ela está aberta, os Clawds saem da barra de tarefas e vivem
+        // lá dentro, numa faixa da largura da janela.
+        FrameworkElement homeView;
+        public bool InHome { get { return homeView != null; } }
+        public double HomeOffsetY { get { return homeView != null ? Math.Max(0, homeView.ActualHeight - Ground - HomeStageView.Floor) : 0; } }
+        FrameworkElement Surface { get { return homeView ?? (FrameworkElement)view; } }
+
+        // Todas as sessões lidas (de todas as contas) a cada leitura, para a Home, os avisos e o histórico.
+        public event Action<List<SessionView>, double> SessionsRead;
+        // O Clawd sob o mouse na Home (a Home destaca a sessão dele).
+        public event Action<Creature> HoverChanged;
+        // Pedidos do menu do Clawd para o app.
+        public event Action OpenAppRequested, QuitRequested;
+        public List<Account> Accounts { get { return accounts; } }
+        public Dictionary<string, int> Running { get { return running; } }
+        public Cfg Config { get { return cfg; } }
+
         public double T { get { return fakeT >= 0 ? fakeT : sw.Elapsed.TotalSeconds; } }
 
         public Stage(bool demo, bool festa, bool photo)
@@ -584,9 +615,117 @@ namespace ClawdDesktop
             }
             accounts.Clear();
             accounts.AddRange(next);
-            W = Math.Max(420, Math.Min(210 * accounts.Count, SystemParameters.WorkArea.Width - 2 * Side));
+            if (!InHome) W = TaskbarWidth();
             if (scene != null && scene.Members().Any(m => !accounts.Contains(m.Acc))) scene = null;
             if (panel != null && panel.Acc != null && !accounts.Contains(panel.Acc)) panel.Close2();
+        }
+
+        double TaskbarWidth() { return Math.Max(420, Math.Min(210 * accounts.Count, SystemParameters.WorkArea.Width - 2 * Side)); }
+
+        // ---------------------------------------------------------------- Home --
+
+        public void AttachHome(FrameworkElement v)
+        {
+            if (homeView == v) return;
+            if (homeView != null) DetachHome();
+            homeView = v;
+            v.MouseLeftButtonDown += OnDown;
+            v.MouseMove += OnMove;
+            v.MouseLeftButtonUp += OnUp;
+            v.MouseRightButtonUp += OnRight;
+            v.SizeChanged += OnHomeSize;
+            if (IsVisible) Hide();
+            panel.Close2();
+            Resize(Math.Max(300, v.ActualWidth > 0 ? v.ActualWidth : 760));
+            double t = T;
+            // pulam para dentro da janela: caem do alto
+            foreach (var c in AllCreatures()) DropIn(c, 90 + rng.NextDouble() * 60);
+            nextEvent = t + 4;
+            Safe(Poll);
+        }
+
+        public void DetachHome()
+        {
+            var v = homeView;
+            if (v == null) return;
+            v.MouseLeftButtonDown -= OnDown;
+            v.MouseMove -= OnMove;
+            v.MouseLeftButtonUp -= OnUp;
+            v.MouseRightButtonUp -= OnRight;
+            v.SizeChanged -= OnHomeSize;
+            if (pressed) { pressed = false; v.ReleaseMouseCapture(); }
+            drag = null;
+            homeView = null;
+            if (hover != null) { hover = null; if (HoverChanged != null) HoverChanged(null); }
+            Resize(TaskbarWidth());
+            // e voltam para cima da barra de tarefas
+            foreach (var c in AllCreatures()) DropIn(c, 60 + rng.NextDouble() * 50);
+            if (nextEvent < T + 20) nextEvent = T + 20;
+            Safe(Poll);
+        }
+
+        void OnHomeSize(object sender, SizeChangedEventArgs e)
+        {
+            if (e.WidthChanged && homeView != null) Resize(Math.Max(300, homeView.ActualWidth));
+        }
+
+        // Muda a largura da faixa e leva cada Clawd junto, na mesma proporção.
+        void Resize(double w)
+        {
+            double old = W;
+            W = w;
+            if (Math.Abs(old - w) < 0.5) return;
+            foreach (var c in AllCreatures()) { c.X = Clamp(c.X * w / old, 24, w - 24); c.WalkTarget = double.NaN; }
+            Homes();
+        }
+
+        void DropIn(Creature c, double from)
+        {
+            if (c == drag) return;
+            c.Lift = from;
+            c.VY = 0;
+            c.Falling = true;
+            c.React = null;
+        }
+
+        // Clique no chão vazio da Home: quem está livre vem ver.
+        void CallTo(double x, double t)
+        {
+            int n = 0;
+            foreach (var c in AllCreatures().Where(c => Free(c, t)).OrderBy(c => Math.Abs(c.X - x)).Take(4))
+            {
+                double off = (n % 2 == 0 ? -1 : 1) * (12 + 26 * ((n + 1) / 2));
+                c.WalkTarget = Clamp(x + off, 24, W - 24);
+                c.Idle = "walk";
+                c.FreeUntil = t + 14;
+                if (n == 0) Say(c, rng.NextDouble() < 0.5 ? "Tô indo!" : "O que foi?", 1.6, t);
+                n++;
+            }
+            if (n == 0) Sparkle(x, Ground - 6, 3);
+        }
+
+        // Começa uma brincadeira agora (botão da Home).
+        public void PlayNow()
+        {
+            if (scene == null) nextEvent = T;
+        }
+
+        // A Home pede: o Clawd daquela sessão dá um alô.
+        public void Ping(string sessionId)
+        {
+            double t = T;
+            var c = AllCreatures().FirstOrDefault(x => x.SessionId == sessionId);
+            if (c == null || c.Falling || c == drag) return;
+            React(c, "wave", 1.6, t);
+            Say(c, c.Pup ? "Tô aqui!" : "Sou eu!", 1.6, t);
+        }
+
+        // A Home pede: desenha os Clawds com o chão no fundo da área dela.
+        public void RenderHome(DrawingContext dc)
+        {
+            dc.PushTransform(new TranslateTransform(0, HomeOffsetY));
+            Render(dc);
+            dc.Pop();
         }
 
         static void Safe(Action f)
@@ -609,11 +748,17 @@ namespace ClawdDesktop
         {
             double t = T;
             if (Cfg.Stamp() != cfgStamp) LoadConfig();
-            fullscreen = Native.ForegroundIsFullscreen(this, panel);
             ReadData(t);
+            if (InHome)
+            {
+                if (IsVisible) Hide();
+                panel.Close2();
+                return;
+            }
+            fullscreen = Native.ForegroundIsFullscreen(this, panel);
             bool any = false;
             foreach (var a in accounts) any |= a.Visible;
-            if (any && !fullscreen)
+            if (any && !fullscreen && cfg.Taskbar)
             {
                 Place();
                 if (!shown) { Show(); shown = true; }
@@ -645,8 +790,9 @@ namespace ClawdDesktop
         {
             double now = Data.NowMs();
             var by = new Dictionary<string, List<SessionView>>();
+            var all = new List<SessionView>();
             foreach (var a in accounts) by[a.Key] = new List<SessionView>();
-            if (demo) DemoSessions(t, now, by);
+            if (demo) { DemoSessions(t, now, by); all = by.Values.SelectMany(x => x).ToList(); }
             else
             {
                 foreach (string f in Directory.GetFiles(sessionsDir, "*.json"))
@@ -655,7 +801,9 @@ namespace ClawdDesktop
                     if (fi.LastWriteTimeUtc < DateTime.UtcNow.AddDays(-7)) { try { fi.Delete(); } catch { } continue; }
                     if (fi.LastWriteTimeUtc < DateTime.UtcNow.AddDays(-1)) continue;
                     var s = SessionView.From(Data.Read(f));
-                    if (s != null && by.ContainsKey(s.Account)) by[s.Account].Add(s);
+                    if (s == null) continue;
+                    all.Add(s);
+                    if (by.ContainsKey(s.Account)) by[s.Account].Add(s);
                 }
             }
 
@@ -675,12 +823,17 @@ namespace ClawdDesktop
                 // Sem sessão ativa o Clawd descansa: fica sentado uns minutos e depois dorme.
                 a.FallbackState = now - last < 300000 ? "descansando" : "dormindo";
 
-                bool want = (a.Running || now - last < 900000) && t >= a.HiddenUntil;
+                // na Home todos aparecem (sem sessão, descansam); na barra, só quem está em uso
+                bool want = InHome || ((a.Running || now - last < 900000) && t >= a.HiddenUntil);
                 if (want && !a.Visible) Appear(a, t);
                 else if (!want && a.Visible) { a.Visible = false; a.Main = null; a.Pups.Clear(); }
                 if (a.Visible) SyncCreatures(a, t);
             }
             Homes();
+            if (SessionsRead != null && !photo)
+            {
+                try { SessionsRead(all, now); } catch (Exception e) { Program.Log("sessões: " + e); }
+            }
         }
 
         static string MoodOf(Dictionary<string, object> m, double now)
@@ -703,6 +856,7 @@ namespace ClawdDesktop
             int n = Math.Max(1, accounts.Count), i = Math.Max(0, accounts.IndexOf(a));
             c.X = W * ((corner == "esquerdo" ? i : n - 1 - i) + 0.5) / n;
             a.Main = c;
+            if (InHome) DropIn(c, 80 + rng.NextDouble() * 60);
             React(c, "greet", 2.4, t);
             Say(c, Greeting(a), 3.5, t);
         }
@@ -864,7 +1018,7 @@ namespace ClawdDesktop
 
         void Frame()
         {
-            if (!IsVisible && !photo) return;
+            if (!IsVisible && !photo && !InHome) return;
             double t = T;
             double dt = Math.Min(0.1, t - lastT);
             lastT = t;
@@ -883,13 +1037,23 @@ namespace ClawdDesktop
             }
             Events(t, dt);
             UpdateParticles(dt);
-            view.InvalidateVisual();
+            Surface.InvalidateVisual();
         }
 
         Point CursorStage()
         {
             Native.POINT p;
             if (!Native.GetCursorPos(out p)) return new Point(-9999, -9999);
+            if (InHome)
+            {
+                try
+                {
+                    if (PresentationSource.FromVisual(homeView) == null) return new Point(-9999, -9999);
+                    Point local = homeView.PointFromScreen(new Point(p.X, p.Y));
+                    return new Point(local.X, local.Y - HomeOffsetY);
+                }
+                catch { return new Point(-9999, -9999); }
+            }
             var src = PresentationSource.FromVisual(this);
             if (src == null || src.CompositionTarget == null) return new Point(-9999, -9999);
             Point dip = src.CompositionTarget.TransformFromDevice.Transform(new Point(p.X, p.Y));
@@ -902,7 +1066,13 @@ namespace ClawdDesktop
             if (drag == null)
                 foreach (var c in AllCreatures().Reverse())
                     if (Inflate(c.Bounds, 4).Contains(cur)) { over = c; break; }
-            if (over != hover) { hover = over; hoverSince = t; }
+            if (over != hover)
+            {
+                hover = over;
+                hoverSince = t;
+                if (InHome && HoverChanged != null) HoverChanged(hover);
+            }
+            if (InHome) return;   // na Home, quem mostra a sessão é o cartão dela
 
             Point screen = new Point(cur.X + Left, cur.Y + Top);
             bool onPanel = panel.IsVisible && new Rect(panel.Left, panel.Top, panel.ActualWidth, panel.ActualHeight).Contains(screen);
@@ -1058,7 +1228,7 @@ namespace ClawdDesktop
 
         void Wander(Account a, Creature c, double t, double dt, Point cur)
         {
-            bool outOfHome = c.X < a.HomeMin - 2 || c.X > a.HomeMax + 2;
+            bool outOfHome = t >= c.FreeUntil && (c.X < a.HomeMin - 2 || c.X > a.HomeMax + 2);
             if (outOfHome && c.Idle != "walk") { c.Idle = "walk"; c.WalkTarget = Clamp(c.X, a.HomeMin, a.HomeMax); }
             if (c.Idle == "walk")
             {
@@ -1207,7 +1377,7 @@ namespace ClawdDesktop
                 else if (t - scene.Start > 45 || !Step(scene, t, dt)) EndScene(t, false);
                 return;
             }
-            if (t < nextEvent || (!cfg.Events && !festa)) return;
+            if (t < nextEvent || (!cfg.Events && !festa && !InHome)) return;
             var free = AllCreatures().Where(c => Free(c, t)).ToList();
             string kind = null;
             if (festa)
@@ -1304,7 +1474,7 @@ namespace ClawdDesktop
                 if (broken && Alive(c) && c.React == null && BusyAnim(c) == null && c != drag && !c.Leaving)
                     Say(c, Pick("Ah…", "Fica pra depois!", "Ué?"), 1.4, t);
             }
-            nextEvent = t + (festa ? 2.5 : 30 + rng.NextDouble() * 45);
+            nextEvent = t + (festa ? 2.5 : InHome ? 10 + rng.NextDouble() * 15 : 30 + rng.NextDouble() * 45);
         }
 
         void PlanMeet(Scene s, double gap)
@@ -2029,23 +2199,36 @@ namespace ClawdDesktop
             return null;
         }
 
+        Point Pos(MouseEventArgs e)
+        {
+            if (!InHome) return e.GetPosition(view);
+            Point p = e.GetPosition(homeView);
+            return new Point(p.X, p.Y - HomeOffsetY);
+        }
+
+        double MaxLift { get { return Ground - 60 + HomeOffsetY; } }
+
         void OnDown(object sender, MouseButtonEventArgs e)
         {
-            Point pt = e.GetPosition(view);
+            Point pt = Pos(e);
             var c = HitTest(pt);
-            if (c == null) return;
+            if (c == null)
+            {
+                if (InHome && pt.Y > Ground - 70) { CallTo(pt.X, T); e.Handled = true; }
+                return;
+            }
             if (e.ClickCount >= 2) { OpenClaude(c.Acc); e.Handled = true; return; }
             pressed = true;
             pressPt = pt;
             pressC = c;
-            view.CaptureMouse();
+            Surface.CaptureMouse();
             e.Handled = true;
         }
 
         void OnMove(object sender, MouseEventArgs e)
         {
             if (!pressed) return;
-            Point pt = e.GetPosition(view);
+            Point pt = Pos(e);
             double t = T;
             if (drag == null)
             {
@@ -2060,7 +2243,7 @@ namespace ClawdDesktop
                 Say(drag, drag.Pup ? "Ei!" : "Ei! Me põe no chão!", 2.2, t);
             }
             drag.X = Clamp(pt.X - dragOff.X, 24, W - 24);
-            drag.Lift = Clamp(Ground - (pt.Y - dragOff.Y), 0, Ground - 60);
+            drag.Lift = Clamp(Ground - (pt.Y - dragOff.Y), 0, MaxLift);
             double vt = Math.Max(0.001, t - lastDragT);
             drag.Swing += (Clamp(-(pt.X - lastDragPt.X) / vt * 0.02, -2, 2) - drag.Swing) * 0.3;
             lastDragPt = pt;
@@ -2071,7 +2254,7 @@ namespace ClawdDesktop
         {
             if (!pressed) return;
             pressed = false;
-            view.ReleaseMouseCapture();
+            Surface.ReleaseMouseCapture();
             double t = T;
             if (drag != null)
             {
@@ -2097,20 +2280,28 @@ namespace ClawdDesktop
 
         void OnRight(object sender, MouseButtonEventArgs e)
         {
-            var c = HitTest(e.GetPosition(view));
+            var c = HitTest(Pos(e));
             if (c == null) return;
             panel.Close2();
             var a = c.Acc;
             var menu = new ContextMenu();
             menu.Items.Add(Item("Abrir o Claude " + a.Name, true, delegate { OpenClaude(a); }));
             menu.Items.Add(Item("Fazer carinho", false, delegate { Pet(c, T); }));
-            menu.Items.Add(Item("Esconder por 1 hora", false, delegate { a.HiddenUntil = T + 3600; a.Visible = false; a.Main = null; a.Pups.Clear(); }));
-            menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Central dos Clawds…", false, delegate { OpenCentral(); }));
-            string other = corner == "esquerdo" ? "direito" : "esquerdo";
-            menu.Items.Add(Item("Ficar no canto " + other, false, delegate { SetCorner(other); }));
-            menu.Items.Add(Item("Fechar os Clawds", false, delegate { Application.Current.Shutdown(); }));
-            menu.PlacementTarget = view;
+            if (InHome)
+            {
+                menu.Items.Add(Item("Brincar agora", false, delegate { PlayNow(); }));
+            }
+            else
+            {
+                menu.Items.Add(Item("Esconder por 1 hora", false, delegate { a.HiddenUntil = T + 3600; a.Visible = false; a.Main = null; a.Pups.Clear(); }));
+                menu.Items.Add(new Separator());
+                menu.Items.Add(Item("Abrir o Clawd Companheiro", false, delegate { if (OpenAppRequested != null) OpenAppRequested(); }));
+                string other = corner == "esquerdo" ? "direito" : "esquerdo";
+                menu.Items.Add(Item("Ficar no canto " + other, false, delegate { SetCorner(other); }));
+                menu.Items.Add(Item("Tirar da barra de tarefas", false, delegate { SetTaskbar(false); }));
+                menu.Items.Add(Item("Sair", false, delegate { if (QuitRequested != null) QuitRequested(); else Application.Current.Shutdown(); }));
+            }
+            menu.PlacementTarget = Surface;
             menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
             menu.IsOpen = true;
             e.Handled = true;
@@ -2134,14 +2325,17 @@ namespace ClawdDesktop
             Homes();
         }
 
-        void OpenCentral()
+        // O app gravou a config: relê já, sem esperar a próxima leitura.
+        public void ReloadConfig()
         {
-            try
-            {
-                string exe = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location), "ClawdCentral.exe");
-                Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
-            }
-            catch (Exception e) { Program.Log("central: " + e.Message); }
+            Safe(LoadConfig);
+            Safe(Poll);
+        }
+
+        public void SetTaskbar(bool on)
+        {
+            try { cfg.Taskbar = on; cfg.Save(); cfgStamp = Cfg.Stamp(); } catch { }
+            Safe(Poll);
         }
 
         void OpenClaude(Account a)
@@ -3267,6 +3461,27 @@ namespace ClawdDesktop
             using (var fs = File.Create(file)) enc.Save(fs);
         }
 
+        // Para as fotos da Home: põe sessões de mentira e anda o relógio.
+        public void PhotoSessions(params SessionView[] sessions)
+        {
+            if (fakeT < 0) fakeT = 0;
+            Scene(sessions);
+        }
+
+        public void PhotoAdvance(double secs)
+        {
+            if (fakeT < 0) fakeT = 0;
+            Run(secs);
+        }
+
+        public static SessionView PhotoSession(string acc, string id, int age, string state, string tool, string detail, string model, string label, int agents)
+        {
+            var s = Fake(acc, id, age, state, tool, detail, model, label, agents);
+            s.UpdatedAt = Data.NowMs();
+            s.TurnStartedAt = Data.NowMs() - 95000;
+            return s;
+        }
+
         // As cenas do README, com duas contas de mentira: cada uma num contexto.
         public void Photos(string dir)
         {
@@ -3521,48 +3736,6 @@ namespace ClawdDesktop
             g.Children.Add(track);
             if (pct > 0.5) g.Children.Add(new Border { Background = fill });
             return g;
-        }
-    }
-
-    // --------------------------------------------------------------- início --
-
-    static class Program
-    {
-        static string logPath;
-
-        public static void Log(string text)
-        {
-            try { File.AppendAllText(logPath, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss ") + text + Environment.NewLine, Encoding.UTF8); } catch { }
-        }
-
-        [STAThread]
-        static void Main(string[] args)
-        {
-            string shared = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "clawd");
-            Directory.CreateDirectory(shared);
-            logPath = System.IO.Path.Combine(shared, "desktop.log");
-            bool festa = args.Any(a => a.Trim('-', '/').Equals("eventos", StringComparison.OrdinalIgnoreCase));
-            bool demo = festa || args.Any(a => a.Trim('-', '/').Equals("demo", StringComparison.OrdinalIgnoreCase));
-            int fi = Array.FindIndex(args, a => a.Trim('-', '/').Equals("fotos", StringComparison.OrdinalIgnoreCase));
-            if (fi >= 0)
-            {
-                // desenha as cenas do README em arquivos, sem abrir nada na tela
-                new Application();
-                new Stage(true, false, true).Photos(fi + 1 < args.Length ? args[fi + 1] : "docs");
-                return;
-            }
-            bool created;
-            using (var mutex = new Mutex(true, demo ? "Local\\ClawdDesktopDemo" : "Local\\ClawdDesktop", out created))
-            {
-                if (!created) return;
-                var app = new Application();
-                app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                app.DispatcherUnhandledException += (s, e) => { Log("erro: " + e.Exception); e.Handled = true; };
-                Log(demo ? "Clawds acordaram (demo)" : "Clawds acordaram");
-                new Stage(demo, festa, false);
-                app.Run();
-                Log("Clawds foram dormir");
-            }
         }
     }
 }

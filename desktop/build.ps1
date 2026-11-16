@@ -1,10 +1,18 @@
-# Compila os Clawds da area de trabalho e a Central dos Clawds com o csc do .NET Framework 4
-# (vem com o Windows). Uso: powershell -File build.ps1 [-Out <pasta>] [-Only desktop|central] [-Setup]
+# Compila o Clawd Companheiro (Clawd.exe) com o csc do .NET Framework 4, que vem com o
+# Windows, e opcionalmente o instalador ClawdSetup.exe, com o programa dentro.
+# A versão vem do arquivo VERSION, na raiz; o plugin.json precisa estar igual.
+#   powershell -File build.ps1 [-Out <pasta>] [-Setup]
 param(
   [string]$Out = (Join-Path $env:USERPROFILE '.claude\clawd\app'),
-  [string]$Only = '',
-  [switch]$Setup   # tambem monta o instalador ClawdSetup.exe, com os dois programas dentro
+  [switch]$Setup   # também monta o instalador ClawdSetup.exe
 )
+$ErrorActionPreference = 'Stop'
+
+$root = Split-Path $PSScriptRoot -Parent
+$version = (Get-Content (Join-Path $root 'VERSION') -Raw).Trim()
+if ($version -notmatch '^\d+\.\d+\.\d+$') { Write-Error "VERSION invalida: '$version'"; exit 1 }
+$plugin = (Get-Content (Join-Path $root '.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
+if ($plugin -ne $version) { Write-Error "plugin.json esta na versao $plugin, mas VERSION diz $version."; exit 1 }
 
 $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
 if (-not (Test-Path (Join-Path $fw 'csc.exe'))) { $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319' }
@@ -24,32 +32,41 @@ $refs = @(
   (Join-Path $fw 'Microsoft.CSharp.dll'),
   (Join-Path $fw 'System.Core.dll')
 ) | ForEach-Object { "/r:$_" }
-
-# O desenho do Clawd e a config sao os mesmos nos dois programas.
-$shared = @('ClawdSprite.cs', 'ClawdConfig.cs') | ForEach-Object { Join-Path $PSScriptRoot $_ }
 $icon = Join-Path $PSScriptRoot 'clawd.ico'
 
-function Build([string]$name, [string]$source) {
-  $exe = Join-Path $Out "$name.exe"
-  $cscArgs = @('/nologo', '/target:winexe', '/optimize+', '/codepage:65001', '/nowarn:0649', "/out:$exe") + $refs
-  if (Test-Path $icon) { $cscArgs += "/win32icon:$icon" }
-  $cscArgs += (Join-Path $PSScriptRoot $source)
-  $cscArgs += $shared
-  & (Join-Path $fw 'csc.exe') @cscArgs
-  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-  Write-Output "ok: $exe"
+# Os atributos de versão de cada programa, gerados a partir do VERSION.
+function VersionFile([string]$title) {
+  $f = Join-Path ([IO.Path]::GetTempPath()) ("clawd-version-" + [Guid]::NewGuid().ToString('N') + '.cs')
+  @"
+[assembly: System.Reflection.AssemblyTitle("$title")]
+[assembly: System.Reflection.AssemblyProduct("Clawd Companheiro")]
+[assembly: System.Reflection.AssemblyCompany("alexzjss")]
+[assembly: System.Reflection.AssemblyVersion("$version.0")]
+[assembly: System.Reflection.AssemblyFileVersion("$version.0")]
+[assembly: System.Reflection.AssemblyInformationalVersion("$version")]
+"@ | Set-Content -Encoding UTF8 $f
+  return $f
 }
 
-if ($Only -ne 'central') { Build 'ClawdDesktop' 'ClawdDesktop.cs' }
-if ($Only -ne 'desktop') { Build 'ClawdCentral' 'ClawdCentral.cs' }
+function Compile([string]$exe, [string]$title, [string[]]$sources, [string[]]$extra) {
+  $ver = VersionFile $title
+  $cscArgs = @('/nologo', '/target:winexe', '/optimize+', '/codepage:65001', '/nowarn:0649', "/out:$exe") + $refs + $extra
+  if (Test-Path $icon) { $cscArgs += "/win32icon:$icon" }
+  $cscArgs += ($sources | ForEach-Object { Join-Path $PSScriptRoot $_ })
+  $cscArgs += $ver
+  & (Join-Path $fw 'csc.exe') @cscArgs
+  $code = $LASTEXITCODE
+  Remove-Item $ver -ErrorAction SilentlyContinue
+  if ($code -ne 0) { exit $code }
+  Write-Output "ok: $exe ($version)"
+}
+
+$app = Join-Path $Out 'Clawd.exe'
+Compile $app 'Clawd Companheiro' @(
+  'ClawdApp.cs', 'ClawdDesktop.cs', 'ClawdHome.cs', 'ClawdHistory.cs', 'ClawdContas.cs',
+  'ClawdServices.cs', 'ClawdUi.cs', 'ClawdShared.cs', 'ClawdSprite.cs', 'ClawdConfig.cs'
+) @()
 
 if ($Setup) {
-  $exe = Join-Path $Out 'ClawdSetup.exe'
-  $cscArgs = @('/nologo', '/target:winexe', '/optimize+', '/codepage:65001', "/out:$exe") + $refs
-  foreach ($p in 'ClawdDesktop.exe', 'ClawdCentral.exe') { $cscArgs += "/resource:$(Join-Path $Out $p),$p" }
-  if (Test-Path $icon) { $cscArgs += "/win32icon:$icon" }
-  $cscArgs += (Join-Path $PSScriptRoot 'ClawdSetup.cs')
-  & (Join-Path $fw 'csc.exe') @cscArgs
-  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-  Write-Output "ok: $exe"
+  Compile (Join-Path $Out 'ClawdSetup.exe') 'Instalador do Clawd Companheiro' @('ClawdSetup.cs', 'ClawdShared.cs') @("/resource:$app,Clawd.exe")
 }
