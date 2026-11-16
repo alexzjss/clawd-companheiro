@@ -638,8 +638,8 @@ namespace ClawdDesktop
             panel.Close2();
             Resize(Math.Max(300, v.ActualWidth > 0 ? v.ActualWidth : 760));
             double t = T;
-            // pulam para dentro da janela: caem do alto
-            foreach (var c in AllCreatures()) DropIn(c, 90 + rng.NextDouble() * 60);
+            // pulam para dentro da janela: cada um cai do alto, na faixa da sua conta
+            Scatter(t, 90);
             nextEvent = t + 4;
             Safe(Poll);
         }
@@ -659,7 +659,7 @@ namespace ClawdDesktop
             if (hover != null) { hover = null; if (HoverChanged != null) HoverChanged(null); }
             Resize(TaskbarWidth());
             // e voltam para cima da barra de tarefas
-            foreach (var c in AllCreatures()) DropIn(c, 60 + rng.NextDouble() * 50);
+            Scatter(T, 60);
             if (nextEvent < T + 20) nextEvent = T + 20;
             Safe(Poll);
         }
@@ -677,6 +677,20 @@ namespace ClawdDesktop
             if (Math.Abs(old - w) < 0.5) return;
             foreach (var c in AllCreatures()) { c.X = Clamp(c.X * w / old, 24, w - 24); c.WalkTarget = double.NaN; }
             Homes();
+        }
+
+        // Mudança de casa: acaba a brincadeira e cada um cai num ponto da faixa da sua conta.
+        void Scatter(double t, double from)
+        {
+            if (scene != null) EndScene(t, false);
+            Homes();
+            foreach (var a in accounts)
+            {
+                if (!a.Visible || a.Main == null) continue;
+                if (a.Main != drag) a.Main.X = a.HomeMin + rng.NextDouble() * Math.Max(0, a.HomeMax - a.HomeMin);
+                foreach (var p in a.Pups) if (p != drag) p.X = Clamp(a.Main.X + PupOffset(p.Slot), 20, W - 20);
+            }
+            foreach (var c in AllCreatures()) DropIn(c, from + rng.NextDouble() * 50);
         }
 
         void DropIn(Creature c, double from)

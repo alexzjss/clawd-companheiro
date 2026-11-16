@@ -51,6 +51,31 @@ namespace ClawdSetup
             }
         }
 
+        // "Windows 11 com .NET Framework 4.8": o Environment.OSVersion mente para quem não tem
+        // manifesto, então a versão vem do registro.
+        public static string SystemName
+        {
+            get
+            {
+                string win = "Windows", net = ".NET Framework 4";
+                try
+                {
+                    using (var k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion"))
+                    {
+                        int build;
+                        if (k != null && int.TryParse(k.GetValue("CurrentBuildNumber") as string, out build)) win = build >= 22000 ? "Windows 11" : build >= 10240 ? "Windows 10" : "Windows";
+                    }
+                    using (var k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"))
+                    {
+                        object r = k != null ? k.GetValue("Release") : null;
+                        if (r is int) net = (int)r >= 533320 ? ".NET Framework 4.8.1" : (int)r >= 528040 ? ".NET Framework 4.8" : (int)r >= 461808 ? ".NET Framework 4.7.2" : ".NET Framework 4";
+                    }
+                }
+                catch { }
+                return win + " com " + net;
+            }
+        }
+
         // O Claude Desktop, da loja ou do instalador comum.
         public static bool HasClaudeDesktop
         {
@@ -327,7 +352,7 @@ namespace ClawdSetup
             sp.Children.Add(v);
             sp.Children.Add(T("Um mascote em pixel art para cada conta do Claude, em cima da barra de tarefas, e uma janela com todas as sessões, estatísticas, temas e avisos quando uma sessão termina ou espera você.", 13.5, Text, false));
             var checks = new StackPanel { Margin = new Thickness(0, 22, 0, 0) };
-            checks.Children.Add(Check("\uE73E", Good, "Windows " + Environment.OSVersion.Version.Major + " com .NET Framework " + Environment.Version.ToString(2)));
+            checks.Children.Add(Check("\uE73E", Good, Installer.SystemName));
             checks.Children.Add(Installer.HasClaudeDesktop ? Check("\uE73E", Good, "Claude Desktop encontrado") : Check("\uE7BA", Warn, "Não achei o Claude Desktop. Instale-o depois, em claude.ai/download"));
             checks.Children.Add(claude != null ? Check("\uE73E", Good, "Claude Code encontrado: dá para instalar o mod junto") : Check("\uE946", Faint, "Claude Code não encontrado: o mod pode ser instalado depois, pelo app"));
             if (installed) checks.Children.Add(Check("\uE946", Faint, "Suas contas, cores, skins e histórico continuam como estão."));
@@ -483,12 +508,9 @@ namespace ClawdSetup
             Dispatcher.Invoke(new Action(delegate { }), System.Windows.Threading.DispatcherPriority.ContextIdle);
             var bmp = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(root.ActualWidth * 1.5), (int)(root.ActualHeight * 1.5), 144, 144, PixelFormats.Pbgra32);
             var dv = new DrawingVisual();
-            using (var dc = dv.RenderOpen())
-            {
-                dc.DrawRectangle(Bg, null, new Rect(0, 0, root.ActualWidth, root.ActualHeight));
-                dc.DrawRectangle(new VisualBrush(root), null, new Rect(0, 0, root.ActualWidth, root.ActualHeight));
-            }
+            using (var dc = dv.RenderOpen()) dc.DrawRectangle(Bg, null, new Rect(0, 0, root.ActualWidth, root.ActualHeight));
             bmp.Render(dv);
+            bmp.Render(root);
             var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
             enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bmp));
             using (var fs = File.Create(file)) enc.Save(fs);
